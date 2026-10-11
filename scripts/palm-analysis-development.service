@@ -1,0 +1,16 @@
+[Unit]
+Description=Palm Analysis development queue consumer (private, no listener)
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/devspace/projects/palm-analysis-development
+ExecStart=/opt/devspace/bin/infisical run --projectId=bde1d1c7-150c-4490-a43f-61ff9b6c6aae --env=dev --path=/ --silent -- /home/devspace/projects/palm-analysis-development/.venv/bin/python /home/devspace/projects/palm-analysis-development/scripts/run_cloud_worker.py
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "palm-backend",
+      "runtimeExecutable": "C:\\Users\\coseung2\\Desktop\\Projects\\palm-analysis\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "palm_backend.app:create_app", "--factory", "--host", "127.0.0.1", "--port", "8000", "--workers", "1"],
+      "port": 8000
+    },
+    {
+      "name": "palm-cloud-development",
+      "runtimeExecutable": "npx.cmd",
+      "runtimeArgs": ["--yes", "wrangler@4.149.0", "dev", "--env", "development", "--local", "--ip", "127.0.0.1", "--port", "8787"],
+      "port": 8787
+    },
+    {
+      "name": "palm-isolated-preview",
+      "runtimeExecutable": "C:\\Users\\coseung2\\Desktop\\Projects\\palm-analysis\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["scripts/preview.py"],
+      "port": 8001
+    }
+  ]
+}

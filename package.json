@@ -1,0 +1,12 @@
+{
+  "name": "palm-analysis",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test cloudflare/worker.test.mjs cloudflare/operators.test.mjs cloudflare/visitor.test.mjs tests/jobs.test.mjs",
+    "check": "node --check cloudflare/worker.mjs && node --check src/palm_backend/web/app.js"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.14"
+  }
+}
