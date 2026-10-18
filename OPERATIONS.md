@@ -71,7 +71,10 @@
 ## 롤백과 보존
 
 - 시연 Worker의 확인된 현재 배포 버전: `df930396-15c7-447b-8885-49e7887064d1` (2026-10-11). 기존 시연 배포를 갱신하지 않았다.
-- Chrome의 기존 로그인에서 Workers Free를 확인한 뒤 개발 Worker를 배포했다: https://palm-analysis-development.mdownloader.workers.dev . 최신 확인 버전은 `803d2a27-cf9a-4eb5-8a4a-d4d57e53234d`다. 유료 플랜으로 변경하지 않았다. production 승격은 하지 않았다.
+- 개발 Worker: https://palm-analysis-development.mdownloader.workers.dev . 2026-10-19 KST 배포 버전은 `d54c1504-960c-44ff-ae67-af14e151410f`, 앱 소스는 `06f71bb5d63bd3d792494120d05a54030548bd77` (`work/palm-booth`)다. 유료 플랜 변경·production 승격은 하지 않았다.
+- 같은 앱 소스를 VM에 반영하고 `palm-analysis-development.service`가 active/running 및 NRestarts=0임을 확인했다. 배포 전 소스/패키지 목록은 VM `data/releases/06f71bb/`에 보존한다. `.env`·머신 인증·서비스 설정·모델 파일은 덮어쓰지 않았다.
+- 로컬 Python 110개·JS 56개, VM 배포 후보 관련 Python 51개 테스트 통과. VM 합성 주름 입력에서 원본+Meijering PNG 동시 요청 구성 확인. 배포 HTTPS health, 정적 자산의 커밋 바이트 일치, 사진 없는 세션 생성/조회/취소 확인. 브라우저 도구 일시 장애로 이번 배포의 화면 재검증은 하지 못했다.
+- 확인 당시 UTC 일일 dispatch는 20회 중 19회 사용, reserved=0·진행 작업=0·삭제 대기=0. 한도는 변경하지 않았고 새 분석은 2회 예약이 필요하므로 배포 후 실제 AI 호출 검증은 생략했다.
 - 개발 DB 변경은 `palm_runtime.schema_revisions`의 이름/체크섬으로 기록한다. 공식 Supabase CLI 이력과는 별개다.
 - CLI `migration new`와 `db diff`는 `Unsupported Config Type ""` 오류다. 공식 이력 정상화는 미완료이며 강제 repair/기존 DB 재초기화는 하지 않는다.
 - 소스 변경이 기존 적용 체크섬과 다르면 설치 스크립트는 덮어쓰지 않고 중단한다. 후속 변경은 새 검증·새 리비전으로 적용한다.
@@ -91,5 +94,5 @@
 - 실제 체험량에 맞춘 부스별 호출 상한, 구독 할당량, 공급자 사진 보관 조건 확정.
 - 동의받은 실제 손 사진의 관찰 품질/안전성 평가. 단색 합성 사진은 정확도 검증이 아니다.
 - 모바일·태블릿 실제 카메라 촬영, 장시간 연속 체험과 네트워크 끊김, 소규모 현장 시험.
-- 민감 정보 없는 크기 제한 운영 이벤트 기록 코드는 추가·테스트했다. 최신 로깅 코드는 아직 VM에 반영하지 않았다. 알림 통합, 공식 마이그레이션 이력 정리, 현장 오류/지연/비용 기준 합의는 남아 있다.
+- 민감 정보 없는 크기 제한 운영 이벤트·지연 계측 코드는 VM에 반영했다. 알림 통합, 공식 마이그레이션 이력 정리, 현장 오류/지연/비용 기준 합의는 남아 있다.
 - 위 검증 후 운영 모드 전환 판단. 그 전에는 goal의 모든 단계를 완료로 표시하지 않는다.
