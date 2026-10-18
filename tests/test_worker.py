@@ -12,13 +12,15 @@ class Repository:
         self.denied = denied
         self.stages = []
         self.results = []
+        self.reasons = []
 
     async def dispatch(self, job, stage):
         self.stages.append(stage)
         return stage != self.denied
 
-    async def finish(self, job, result, error):
+    async def finish(self, job, result, error, *, reason=None):
         self.results.append((result, error))
+        self.reasons.append(reason)
         return True
 
 
@@ -62,6 +64,7 @@ def test_retake_skips_story_and_reports_failure():
     run(repo, analyzer)
     assert analyzer.calls == ["observe"]
     assert repo.results == [(None, "retake_required")]
+    assert repo.reasons == ["다시 촬영"]
 
 
 def test_failed_provider_is_not_retried_or_replaced_with_demo():
@@ -80,3 +83,25 @@ def test_result_withholds_unclear_lines_even_if_story_contains_a_reading():
     assert result.mode == "ocx" and not result.is_demo
     assert len(result.lines) == 4
     assert all("보류" in line.reading for line in result.lines)
+    assert analyzer.calls == ['observe', 'narrate']
+
+
+def test_partially_readable_palm_is_completed_without_inventing_hidden_lines():
+    class PartialPalm(Analyzer):
+        async def observe(self, image):
+            value = await super().observe(image)
+            lines = [line.model_copy(update={
+                'visibility': 'visible' if line.name == 'life' else 'not_visible',
+                'trait': '부분 관찰' if line.name == 'life' else '관찰 불가',
+            }) for line in value.lines]
+            return value.model_copy(update={'quality': 'usable', 'hand': 'unknown', 'lines': lines})
+
+    repo, analyzer = Repository(), PartialPalm()
+    run(repo, analyzer)
+    result, error = repo.results[0]
+    assert error is None
+    assert analyzer.calls == ['observe', 'narrate']
+    assert result.hand == 'unknown'
+    assert sum(line.visibility == 'visible' for line in result.lines) == 1
+    assert all('보류' in line.reading for line in result.lines if line.visibility != 'visible')
+    assert repo.reasons == [None]

@@ -12,6 +12,7 @@ from .images import prepare_image
 from .models import BoothConfig
 from .providers import OCXAnalyzer
 from .runtime_logging import configure, event
+from .timing import analysis_timing, configure_timing, stage
 from .worker import Job, consume
 
 
@@ -36,12 +37,16 @@ class RuntimeRPC:
     async def dispatch(self, job, stage):
         return await self.rpc('dispatch', {'job': job.id, 'lease': job.lease, 'stage': stage}) is True
 
-    async def finish(self, job, result, error):
+    async def finish(self, job, result, error, *, reason=None):
         args = {'job': job.id, 'lease': job.lease}
         if result is not None:
             args['result'] = result.model_dump()
         if error is not None:
             args['error'] = error
+        if error == 'retake_required' and reason:
+            cleaned = ''.join(char for char in reason if char.isprintable()).strip()
+            if cleaned:
+                args['retake_reason'] = ('AI의 재촬영 판정 사유: ' + cleaned)[:300]
         accepted = await self.rpc('finish', args) is True
         if accepted:
             event('job_finished', outcome='completed' if result is not None else 'failed')
@@ -50,6 +55,11 @@ class RuntimeRPC:
         return accepted
 
     async def read(self, key):
+        with stage('photo_fetch'):
+            content, media_type = await self._download_photo(key)
+        return prepare_image(content, media_type)
+
+    async def _download_photo(self, key):
         if key != str(uuid.UUID(key[:-4])) + '.jpg':
             raise ValueError('Invalid private photo key')
         async with self.client.stream('GET', self.url + '/storage/v1/object/palm-uploads/' + key, headers=self.headers) as response:
@@ -61,7 +71,7 @@ class RuntimeRPC:
                 if len(content) > 5 * 1024 * 1024:
                     raise ValueError('Photo too large')
             media_type = response.headers.get('content-type', '').split(';')[0]
-        return prepare_image(bytes(content), media_type)
+        return bytes(content), media_type
 
     async def clean_one(self):
         lease = str(uuid.uuid4())
@@ -97,8 +107,9 @@ async def run_once():
             if row:
                 started = time.monotonic()
                 try:
-                    async with asyncio.timeout(150):
-                        await consume(Job(row['id'], lease, row['photo_key'], BoothConfig.model_validate(row['config'])), repository, repository, OCXAnalyzer(settings, client))
+                    with analysis_timing(enqueued_at=row.get('created_at')):
+                        async with asyncio.timeout(150):
+                            await consume(Job(row['id'], lease, row['photo_key'], BoothConfig.model_validate(row['config'])), repository, repository, OCXAnalyzer(settings, client))
                 finally:
                     event('job_cycle_duration', duration_ms=int((time.monotonic() - started) * 1000))
         await repository.clean_one()
@@ -106,6 +117,7 @@ async def run_once():
 
 async def main():
     configure()
+    configure_timing()
     while True:
         try:
             await run_once()

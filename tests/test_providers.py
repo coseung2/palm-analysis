@@ -110,6 +110,6 @@ def test_normalization_strips_metadata():
     original.save(stream, "JPEG", exif=exif)
     normalized = prepare_image(stream.getvalue(), "image/jpeg")
     with Image.open(io.BytesIO(normalized.data)) as cleaned:
-        assert max(cleaned.size) == 1024
+        assert max(cleaned.size) == 1600
         assert not cleaned.getexif()
     assert b"private photo metadata" not in normalized.data

@@ -1,6 +1,7 @@
+import math
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 LINE_NAMES = ("life", "head", "heart", "fate")
 DISCLAIMER = (
@@ -28,11 +29,36 @@ class ConfigUpdate(BoothConfig):
     pass
 
 
+class TracePoint(StrictModel):
+    x: float = Field(ge=0, le=1)
+    y: float = Field(ge=0, le=1)
+
+
 class LineObservation(StrictModel):
     name: Literal["life", "head", "heart", "fate"]
     visibility: Literal["visible", "unclear", "not_visible"]
     trait: str = Field(min_length=1, max_length=100)
     description: str = Field(min_length=1, max_length=500)
+    trace: list[TracePoint] = Field(default_factory=list)
+
+    @field_validator('trace', mode='before')
+    @classmethod
+    def valid_trace(cls, value):
+        if not isinstance(value, list) or not 2 <= len(value) <= 24:
+            return []
+        for point in value:
+            data = point.model_dump() if isinstance(point, TracePoint) else point
+            if not isinstance(data, dict) or set(data) != {'x', 'y'}:
+                return []
+            if not all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and 0 <= v <= 1 for v in data.values()):
+                return []
+        return value
+
+    @model_validator(mode='after')
+    def withhold_uncertain_trace(self):
+        if self.visibility != 'visible':
+            self.trace = []
+        return self
 
 
 class Observation(StrictModel):

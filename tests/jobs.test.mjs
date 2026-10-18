@@ -13,6 +13,7 @@ async function setup(limit=8) {
   await db.exec(await readFile(new URL('../supabase/schemas/jobs.sql',import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../supabase/schemas/worker_api.sql',import.meta.url),'utf8'));
   await db.exec(await readFile(new URL('../supabase/schemas/visitor_api.sql',import.meta.url),'utf8'));
+  await db.exec(await readFile(new URL('../supabase/schemas/retake_feedback.sql',import.meta.url),'utf8'));
   await db.query('insert into palm_runtime.booths(id,enabled,daily_call_limit) values($1,true,$2)',[booth,limit]);
   await db.query("insert into palm_runtime.sessions(id,booth_id,token_hash,consent,config,expires_at) values($1,$2,$3,true,'{}',now()+interval '1 hour')",[session,booth,hash]);
   await db.exec('set role service_role');
@@ -145,6 +146,35 @@ test('expired upload is released, deleted, and not requeued',options,async()=>{
     assert.deepEqual((await db.query('select state,reserved,error_code from palm_runtime.jobs')).rows,[{state:'failed',reserved:0,error_code:'upload_expired'}]);
     assert.equal((await db.query('select due_at<=now() as due from palm_runtime.photo_deletions')).rows[0].due,true);
   } finally {await db.close();}
+});
+test('retake feedback survives finish and remains scoped to its session',options,async()=>{
+  const db=await setup();
+  try {
+    await enqueue(db); await claim(db); await dispatch(db);
+    const finish=args=>db.query('select public.palm_worker($1,$2) as ok',['finish',JSON.stringify({job,lease,error:'retake_required',...args})]);
+    const reason='AI의 재촬영 판정 사유: 손바닥 일부가 가려져 있습니다.';
+    assert.equal((await finish({retake_reason:reason})).rows[0].ok,true);
+    const view=args=>db.query('select public.palm_visitor($1,$2) as data',['view',JSON.stringify({booth,id:session,token_hash:hash,...args})]);
+    assert.equal((await view()).rows[0].data.error.message,reason);
+    await assert.rejects(view({token_hash:'b'.repeat(64)}),/session_not_found/);
+    assert.equal((await finish({retake_reason:'late overwrite'})).rows[0].ok,false);
+    assert.equal((await view()).rows[0].data.error.message,reason);
+    await db.query('select palm_runtime.cancel($1)',[session]);
+    assert.equal((await view()).rows[0].data.error,null);
+    await db.query("update palm_runtime.sessions set expires_at=now()-interval '1 second'");
+    await assert.rejects(view(),/session_not_found/);
+  } finally {await db.close();}
+});
+test('retake feedback is bounded and legacy workers retain fallback text',options,async()=>{
+  for(const reason of [undefined,'가'.repeat(400)]) {
+    const db=await setup();
+    try {
+      await enqueue(db); await claim(db); await dispatch(db);
+      await db.query('select public.palm_worker($1,$2)',['finish',JSON.stringify({job,lease,error:'retake_required',retake_reason:reason})]);
+      const view=(await db.query('select palm_runtime.session_view($1) as data',[session])).rows[0].data;
+      assert.equal(view.error.message,reason===undefined?'손바닥이 선명하게 보이도록 다시 촬영해 주세요.':'가'.repeat(300));
+    } finally {await db.close();}
+  }
 });
 test('browser roles have neither schema usage nor execute access',options,async()=>{
   const db=await setup();

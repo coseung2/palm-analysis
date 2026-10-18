@@ -3,10 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test cloudflare/worker.test.mjs cloudflare/operators.test.mjs cloudflare/visitor.test.mjs tests/jobs.test.mjs",
-    "check": "node --check cloudflare/worker.mjs && node --check src/palm_backend/web/app.js"
+    "test": "node --test cloudflare/worker.test.mjs cloudflare/operators.test.mjs cloudflare/visitor.test.mjs tests/jobs.test.mjs tests/experience.test.mjs tests/camera.test.mjs tests/palm-map.test.mjs",
+    "check": "node --check cloudflare/worker.mjs && node --check src/palm_backend/web/app.js && node --check src/palm_frontend/scene.js",
+    "build": "esbuild src/palm_frontend/scene.js --bundle --minify --format=iife --target=es2022 --outfile=src/palm_backend/web/scene.js && esbuild src/palm_frontend/app.js --bundle --minify --format=esm --target=es2022 --outfile=src/palm_backend/web/app.js"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.3.14"
+    "@electric-sql/pglite": "0.3.14",
+    "esbuild": "0.28.2"
+  },
+  "dependencies": {
+    "gsap": "3.15.0",
+    "three": "0.186.1"
   }
 }

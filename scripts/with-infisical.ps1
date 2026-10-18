@@ -3,7 +3,7 @@ param(
     [string]$Environment = 'dev',
     [string]$SecretPath = '/',
     [Parameter(Mandatory=$true)][string]$Executable,
-    [Parameter(ValueFromRemainingArguments=$true)][string[]]$CommandArguments
+    [Parameter(Position=1, ValueFromRemainingArguments=$true)][string[]]$CommandArguments
 )
 $ErrorActionPreference = 'Stop'
 $root = Join-Path $env:LOCALAPPDATA 'Eoseowa\infisical-machine'

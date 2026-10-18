@@ -42,7 +42,13 @@ async def main():
                     if result['status'] != 'failed' or result.get('error', {}).get('code') != 'retake_required':
                         print('Synthetic outcome status:', result['status'], 'error code:', (result.get('error') or {}).get('code'))
                         raise RuntimeError('Expected blank-photo retake')
-                    print('Deployed HTTPS gateway, VM consumer and OCX blank-photo retake verified; elapsed seconds:', round(time.monotonic() - started, 1))
+                    message = result.get('error', {}).get('message', '')
+                    if not message.startswith('AI의 재촬영 판정 사유: ') or len(message) > 300:
+                        raise RuntimeError('Specific bounded retake feedback was not delivered')
+                    denied = await client.get(endpoint, headers={'Authorization': 'Bearer ' + '0' * 64})
+                    if denied.status_code != 404:
+                        raise RuntimeError('Invalid session token was not denied')
+                    print('Deployed HTTPS gateway, VM consumer, OCX retake reason and session isolation verified; elapsed seconds:', round(time.monotonic() - started, 1))
                     break
                 await asyncio.sleep(2)
             else:

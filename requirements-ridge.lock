@@ -1,0 +1,10 @@
+# Optional Meijering medium-width evidence view (experiment 9), CPU only.
+numpy==1.26.4
+opencv-contrib-python==4.11.0.86
+scikit-image==0.25.2
+scipy==1.17.1
+networkx==3.6.1
+imageio==2.38.1
+tifffile==2026.3.3
+packaging==26.3
+lazy-loader==0.6

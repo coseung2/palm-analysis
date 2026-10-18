@@ -60,7 +60,7 @@ export async function handle(request, env) {
     const response=await env.ASSETS.fetch(request);
     const headers=new Headers(response.headers);
     headers.set('X-Content-Type-Options','nosniff'); headers.set('Referrer-Policy','no-referrer');
-    headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+    headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
     headers.set('Permissions-Policy','camera=(self), microphone=(), geolocation=()');
     return new Response(response.body,{status:response.status,headers});
   }

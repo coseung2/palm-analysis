@@ -7,6 +7,8 @@ import pytest
 from PIL import Image
 
 from palm_backend.cloud_worker import RuntimeRPC
+from palm_backend.models import BoothConfig
+from palm_backend.worker import Job
 
 BASE = 'https://ihkbmxwidahgbrvxmrrk.supabase.co'
 KEY = 'test-only-server-key'
@@ -26,6 +28,24 @@ def test_cloud_worker_rpc_uses_only_explicit_development_target():
             for target in ['https://pyugqoogcoynvywihgym.supabase.co', 'http://ihkbmxwidahgbrvxmrrk.supabase.co', BASE + '/unexpected']:
                 with pytest.raises(ValueError):
                     RuntimeRPC(target, KEY, client)
+    asyncio.run(run())
+
+
+def test_retake_reason_is_bounded_and_only_sent_for_retake():
+    async def run():
+        requests = []
+        def handler(request):
+            requests.append(json.loads(request.content)['p_args'])
+            return httpx.Response(200, json=True)
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            repo = RuntimeRPC(BASE, KEY, client)
+            job = Job('job', 'lease', 'job.jpg', BoothConfig())
+            await repo.finish(job, None, 'retake_required', reason='손을 펴 주세요.\x00' + '가' * 400)
+            await repo.finish(job, None, 'provider_busy', reason='private upstream detail')
+        assert requests[0]['retake_reason'].startswith('AI의 재촬영 판정 사유: 손을 펴 주세요.')
+        assert len(requests[0]['retake_reason']) == 300
+        assert '\x00' not in requests[0]['retake_reason']
+        assert 'retake_reason' not in requests[1]
     asyncio.run(run())
 
 

@@ -97,13 +97,19 @@ def test_public_ocx_start_still_requires_external_photo_consent(settings):
 def test_web_assets_preserve_api_authentication(client):
     response = client.get("/")
     assert response.status_code == 200
-    assert "손금 부스" in response.text
+    assert "수문 — 손에 새겨진 우주" in response.text
+    assert 'id="app"' in response.text
+    assert '<script src="/app.js" type="module"></script>' in response.text
+    assert 'class="cards"' not in response.text
     assert response.headers["Cache-Control"] == "no-store"
-    for path, content_type in (("/app.js", "javascript"), ("/style.css", "text/css")):
+    for path, content_type in (("/app.js", "javascript"), ("/scene.js", "javascript"), ("/style.css", "text/css")):
         asset = client.get(path)
         assert asset.status_code == 200
         assert content_type in asset.headers["Content-Type"]
         assert OPERATOR_KEY not in asset.text
+    audio = client.get("/portal.wav")
+    assert audio.status_code == 200
+    assert audio.content.startswith(b"RIFF")
     assert client.get("/.env").status_code == 404
     assert client.get("/v1/config").status_code == 401
     assert client.post("/v1/sessions", json={}).status_code == 401

@@ -6,6 +6,18 @@ import {runtimeReady} from './runtime.mjs';
 const env={PALM_ENVIRONMENT:'demo',PALM_API_ENABLED:'true',PALM_SUPABASE_PROJECT_REF:'aaaaaaaaaaaaaaaaaaaa',SUPABASE_URL:'https://aaaaaaaaaaaaaaaaaaaa.supabase.co',SUPABASE_SERVICE_KEY:'server-test-key',OPERATOR_KEY:'test-only-not-a-real-operator-secret'};
 const auth={Authorization:`Bearer ${env.OPERATOR_KEY}`,'Content-Type':'application/json'};
 
+test('static experience keeps scripts local and permits captured media',async()=>{
+  const response=await handle(new Request('https://booth.test/scene.js'),{
+    ASSETS:{fetch:async()=>new Response('local scene bundle',{headers:{'Content-Type':'text/javascript'}})}
+  });
+  assert.equal(response.status,200);
+  const csp=response.headers.get('Content-Security-Policy');
+  assert.match(csp,/script-src 'self';/);
+  assert.match(csp,/media-src 'self' blob:;/);
+  assert.ok(!csp.includes('unsafe-eval'));
+  assert.equal(response.headers.get('Permissions-Policy'),'camera=(self), microphone=(), geolocation=()');
+});
+
 test('health labels demo without photo upload',async()=>{
   const response=await handle(new Request('https://booth.test/health'),env);
   const data=await response.json(); assert.equal(data.demo_without_photo,true); assert.equal(data.analysis_mode,'demo');

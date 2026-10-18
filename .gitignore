@@ -1,4 +1,5 @@
 .venv/
+.vercel/
 .env
 __pycache__/
 *.py[cod]
@@ -6,6 +7,8 @@ __pycache__/
 .ruff_cache/
 *.egg-info/
 data/
+*.pth
+*.onnx
 .coverage
 node_modules/
 .wrangler/
@@ -25,3 +28,5 @@ supabase/.temp/
 *.dpapi
 *.p12
 *.pfx
+
+.vercel

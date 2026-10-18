@@ -45,6 +45,11 @@ def test_ocx_uses_only_selected_gateway_and_normalized_photo():
             assert body["stream"] is True
             assert body["model"] == "gpt-6.1-sol"
             assert body["text"]["format"]["strict"] is True
+            if len(requests) == 1:
+                assert 'Set quality=usable when a palm is identifiable' in body['instructions']
+                assert 'Do not require all fingers or all four lines to be visible.' in body['instructions']
+                assert 'NONE of' in body['instructions']
+                assert 'Do not fabricate detected lines' in body['instructions']
             result = observation if len(requests) == 1 else story
             return httpx.Response(200, json={"status": "completed", "output": [
                 {"type": "reasoning", "summary": []},

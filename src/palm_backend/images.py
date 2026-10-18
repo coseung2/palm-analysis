@@ -5,7 +5,10 @@ from dataclasses import dataclass
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
+from .enhancement import enhance_palm
 from .errors import ApiError
+from .palm_roi import locate_palm
+from .timing import stage
 
 
 @dataclass(frozen=True)
@@ -13,9 +16,16 @@ class PreparedImage:
     data: bytes
     digest: str
     media_type: str = "image/jpeg"
+    palm_detail: bytes | None = None
+    enhanced_detail: bytes | None = None
 
 
 def prepare_image(data: bytes, declared_type: str | None) -> PreparedImage:
+    with stage('image_normalize'):
+        return _prepare_image(data, declared_type)
+
+
+def _prepare_image(data: bytes, declared_type: str | None) -> PreparedImage:
     allowed = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"}
     if declared_type not in allowed:
         raise ApiError(415, "unsupported_image", "JPEG, PNG, WebP 사진만 사용할 수 있습니다.")
@@ -40,9 +50,27 @@ def prepare_image(data: bytes, declared_type: str | None) -> PreparedImage:
                 image.verify()
             with Image.open(io.BytesIO(data)) as source:
                 image = ImageOps.exif_transpose(source).convert("RGB")
-                image.thumbnail((1024, 1024))
+                detail = None
+                try:
+                    with stage('palm_roi'):
+                        box = locate_palm(image)
+                except Exception:
+                    box = None  # A local detector failure must not reject a valid photo.
+                if box:
+                    crop = image.crop(box)
+                    crop.thumbnail((2048, 2048))
+                    out = io.BytesIO()
+                    crop.save(out, format="JPEG", quality=95)
+                    detail = out.getvalue()
+                image.thumbnail((2048, 2048))
+                enhanced = None
+                try:
+                    with stage('image_enhance'):
+                        enhanced = enhance_palm(image)
+                except Exception:
+                    pass  # Auxiliary enhancement must not reject a usable original.
                 out = io.BytesIO()
-                image.save(out, format="JPEG", quality=85)
+                image.save(out, format="JPEG", quality=95)
                 normalized = out.getvalue()
     except ApiError:
         raise
@@ -56,4 +84,5 @@ def prepare_image(data: bytes, declared_type: str | None) -> PreparedImage:
         raise ApiError(
             422, "invalid_image", "사진을 읽을 수 없습니다. 다시 촬영해 주세요."
         ) from exc
-    return PreparedImage(data=normalized, digest=hashlib.sha256(normalized).hexdigest())
+    return PreparedImage(data=normalized, digest=hashlib.sha256(normalized).hexdigest(),
+                         palm_detail=detail, enhanced_detail=enhanced)

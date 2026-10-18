@@ -8,6 +8,7 @@ from .images import PreparedImage
 from .models import AnalysisResult, BoothConfig, ResultLine
 from .providers import Analyzer
 from .safety import validate_story
+from .timing import mark_outcome, stage
 
 
 @dataclass(frozen=True)
@@ -20,7 +21,7 @@ class Job:
 
 class JobRepository(Protocol):
     async def dispatch(self, job: Job, stage: int) -> bool: ...
-    async def finish(self, job: Job, result: AnalysisResult | None, error: str | None) -> bool: ...
+    async def finish(self, job: Job, result: AnalysisResult | None, error: str | None, *, reason: str | None = None) -> bool: ...
 
 
 class PrivatePhotos(Protocol):
@@ -29,18 +30,31 @@ class PrivatePhotos(Protocol):
 
 async def consume(job: Job, repository: JobRepository, photos: PrivatePhotos, analyzer: Analyzer):
     """No automatic upstream retry after an ambiguous dispatch or transport failure."""
+    async def save(result, error, *, reason=None):
+        with stage('result_save'):
+            kwargs = {'reason': reason} if reason is not None else {}
+            accepted = await repository.finish(job, result, error, **kwargs)
+        mark_outcome(('completed' if result is not None else 'failed') if accepted else 'late_result')
+
     try:
-        image = await photos.read(job.photo_key)
-        if not await repository.dispatch(job, 1):
+        with stage('photo_total'):
+            image = await photos.read(job.photo_key)
+        with stage('reservation_rpc'):
+            allowed = await repository.dispatch(job, 1)
+        if not allowed:
             return
-        observation = await analyzer.observe(image)
+        with stage('observation_total'):
+            observation = await analyzer.observe(image)
         del image
         if observation.quality == "retake":
-            await repository.finish(job, None, "retake_required")
+            await save(None, "retake_required", reason=observation.retake_reason)
             return
-        if not await repository.dispatch(job, 2):
+        with stage('reservation_rpc'):
+            allowed = await repository.dispatch(job, 2)
+        if not allowed:
             return
-        story = validate_story(await analyzer.narrate(observation, job.config))
+        with stage('narration_total'):
+            story = validate_story(await analyzer.narrate(observation, job.config))
         readings = {line.name: line.reading for line in story.readings}
         lines = [ResultLine(
             **line.model_dump(),
@@ -51,9 +65,9 @@ async def consume(job: Job, repository: JobRepository, photos: PrivatePhotos, an
             mode="ocx", is_demo=False, hand=observation.hand,
             lines=lines, visions=story.visions, config_version=job.config.version,
         )
-        await repository.finish(job, result, None)
+        await save(result, None)
     except (ProviderError, ApiError) as error:
-        await repository.finish(job, None, error.code)
+        await save(None, error.code)
     except Exception:
         # Photo-store failures and malformed output never become demo successes.
-        await repository.finish(job, None, "worker_failed")
+        await save(None, "worker_failed")
