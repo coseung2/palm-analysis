@@ -11,7 +11,7 @@ from pathlib import Path
 
 LOGGER = logging.getLogger('palm_analysis_timing')
 STAGES = frozenset({
-    'photo_total', 'photo_fetch', 'image_normalize', 'palm_roi', 'image_enhance', 'line_mask',
+    'photo_total', 'photo_fetch', 'image_normalize', 'palm_roi', 'image_enhance', 'line_mask', 'line_segment',
     'observation_total', 'observe_gateway', 'narration_total', 'narrate_gateway',
     'reservation_rpc', 'result_save',
 })

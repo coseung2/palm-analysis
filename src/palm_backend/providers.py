@@ -204,6 +204,24 @@ class ClaudeAnalyzer:
                         'data': base64.b64encode(overlay).decode('ascii'),
                     }},
                 ])
+        if self.settings.line_segmenter_path:
+            from .line_segmenter import segment_lines
+
+            with stage('line_segment'):
+                segmentation = await asyncio.to_thread(
+                    segment_lines, image.data, image.palm_box, self.settings.line_segmenter_path)
+            if segmentation:
+                names = {'heart': '감정선', 'head': '두뇌선', 'life': '생명선'}
+                found = ', '.join(
+                    f"{names[line.name]}({'뚜렷' if line.strength == 'strong' else '약함'})"
+                    for line in segmentation.lines)
+                content.extend([
+                    {'type': 'text', 'text': f'다음 이미지는 첫 전체 사진과 같은 영역·방향·종횡비에 그린 실험적 3종 주름 분할 후보입니다. 빨강=감정선, 파랑=두뇌선, 초록=생명선 후보이며 모델 표시: {found}. 보정되지 않은 소형 모델이라 선 종류를 자주 혼동합니다. 특히 초록 후보가 엄지 두덩을 감싸지 않고 손바닥 중앙을 세로로 지나면 생명선이 아닐 수 있습니다. 운명선은 이 모델이 표시하지 않으므로 표시가 없다는 이유로 운명선을 부정하지 마세요. 원본에서 직접 확인되는 위치만 참고하고, 표시가 없는 선을 보이지 않는다고 단정하거나 후보 유무로 사진을 거부하지 마세요.'},
+                    {'type': 'image', 'source': {
+                        'type': 'base64', 'media_type': 'image/png',
+                        'data': base64.b64encode(segmentation.overlay).decode('ascii'),
+                    }},
+                ])
         content.append({'type': 'text', 'text': '사진에서 실제로 확인되는 손금만 기술해 주세요.'})
         return await self._generate(OBSERVATION_SYSTEM, content, Observation)
 

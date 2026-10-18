@@ -1,0 +1,10 @@
+# Optional palm-line-reader 3-line overlay (CPU onnxruntime). numpy matches the ridge/vision locks.
+onnxruntime==1.22.0
+numpy==1.26.4
+coloredlogs==15.0.1
+flatbuffers==25.12.19
+humanfriendly==10.0
+packaging==26.3
+protobuf==4.25.9
+sympy==1.14.0
+mpmath==1.3.0

@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     ocx_api_key: SecretStr | None = None
     ocx_model: str = "gpt-6.1-sol"
     line_model_path: str | None = None
+    line_segmenter_path: str | None = None
     ocx_image_detail: Literal['low', 'high', 'original'] = 'high'
     ocx_observation_effort: Literal['low', 'medium', 'high', 'xhigh'] = 'high'
     ocx_observation_max_output_tokens: int = Field(default=6000, ge=2500, le=16000)

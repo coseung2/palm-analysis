@@ -13,7 +13,7 @@ def main():
         raise SystemExit('Worker secret mapping incomplete; values suppressed.')
     keep = (
         'PATH', 'HOME', 'LANG', 'USER', 'LOGNAME', 'TMPDIR', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
-        'PALM_LINE_MODEL_PATH', 'OMP_NUM_THREADS', 'MKL_NUM_THREADS',
+        'PALM_LINE_MODEL_PATH', 'PALM_LINE_SEGMENTER_PATH', 'OMP_NUM_THREADS', 'MKL_NUM_THREADS',
     )
     environment = {name: os.environ[name] for name in (*REQUIRED, *keep) if name in os.environ}
     os.execve(sys.executable, [sys.executable, '-m', 'palm_backend.cloud_worker'], environment)

@@ -47,6 +47,7 @@ def test_original_resolution_roi_and_no_upscale(monkeypatch):
     with Image.open(io.BytesIO(photo.palm_detail)) as crop:
         assert crop.size == (1200, 1200)
         assert not crop.getexif()
+    assert photo.palm_box == (400 / 3200, 300 / 2400, 1600 / 3200, 1500 / 2400)
 
 
 def test_detector_error_is_not_a_photo_rejection(monkeypatch):
@@ -55,7 +56,8 @@ def test_detector_error_is_not_a_photo_rejection(monkeypatch):
     monkeypatch.setattr('palm_backend.images.locate_palm', fail)
     source = io.BytesIO()
     Image.new('RGB', (800, 600), 'white').save(source, 'PNG')
-    assert prepare_image(source.getvalue(), 'image/png').palm_detail is None
+    prepared = prepare_image(source.getvalue(), 'image/png')
+    assert prepared.palm_detail is None and prepared.palm_box is None
 
 
 def test_ocx_sends_overview_and_crop_in_one_observation_with_explicit_options(monkeypatch):

@@ -18,6 +18,8 @@ class PreparedImage:
     media_type: str = "image/jpeg"
     palm_detail: bytes | None = None
     enhanced_detail: bytes | None = None
+    # ROI as fractions of the overview, so auxiliary views can map back to its frame.
+    palm_box: tuple[float, float, float, float] | None = None
 
 
 def prepare_image(data: bytes, declared_type: str | None) -> PreparedImage:
@@ -51,6 +53,7 @@ def _prepare_image(data: bytes, declared_type: str | None) -> PreparedImage:
             with Image.open(io.BytesIO(data)) as source:
                 image = ImageOps.exif_transpose(source).convert("RGB")
                 detail = None
+                fraction = None
                 try:
                     with stage('palm_roi'):
                         box = locate_palm(image)
@@ -62,6 +65,8 @@ def _prepare_image(data: bytes, declared_type: str | None) -> PreparedImage:
                     out = io.BytesIO()
                     crop.save(out, format="JPEG", quality=95)
                     detail = out.getvalue()
+                    fraction = (box[0] / image.width, box[1] / image.height,
+                                box[2] / image.width, box[3] / image.height)
                 image.thumbnail((2048, 2048))
                 enhanced = None
                 try:
@@ -85,4 +90,4 @@ def _prepare_image(data: bytes, declared_type: str | None) -> PreparedImage:
             422, "invalid_image", "사진을 읽을 수 없습니다. 다시 촬영해 주세요."
         ) from exc
     return PreparedImage(data=normalized, digest=hashlib.sha256(normalized).hexdigest(),
-                         palm_detail=detail, enhanced_detail=enhanced)
+                         palm_detail=detail, enhanced_detail=enhanced, palm_box=fraction)
