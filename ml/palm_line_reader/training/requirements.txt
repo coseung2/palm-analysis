@@ -1,0 +1,13 @@
+# Install CUDA-enabled torch/torchvision FIRST (see README.md) -- they are
+# intentionally not pinned here since the right wheel depends on your CUDA
+# driver version and pip install -r would otherwise silently pull CPU wheels.
+segmentation-models-pytorch==0.5.0
+albumentations==1.4.18
+opencv-python==4.11.0.86
+numpy==2.4.2
+scipy==1.17.0
+scikit-image==0.26.0
+pillow==12.1.0
+onnx==1.21.0
+onnxruntime==1.25.1
+onnxconverter-common==1.16.0
