@@ -12,6 +12,9 @@ Opens http://127.0.0.1:8765/ in your browser. Review status (edited /
 approved / rejected) is tracked in data/reviewed.csv, kept separate from
 manifest.csv (which generate_pseudo_labels.py owns and may still be
 appending to) so the two writers never race on the same file.
+
+Class 4 is the fate line. Masks without it stay valid 3-line labels; train
+with --num_lines 4 only once enough images have the fate line painted.
 """
 
 from __future__ import annotations
@@ -30,7 +33,7 @@ from urllib.parse import unquote, urlparse
 import cv2
 import numpy as np
 
-CLASS_COLORS = {0: (0, 0, 0), 1: (255, 0, 0), 2: (0, 0, 255), 3: (0, 255, 0)}  # class -> (R, G, B)
+CLASS_COLORS = {0: (0, 0, 0), 1: (255, 0, 0), 2: (0, 0, 255), 3: (0, 255, 0), 4: (255, 200, 0)}  # class -> (R, G, B)
 
 
 def load_manifest(data_dir: Path) -> dict:
@@ -90,7 +93,7 @@ def bgra_to_class_index(bgra: np.ndarray) -> np.ndarray:
     """
     alpha = bgra[:, :, 3]
     rgb = bgra[:, :, [2, 1, 0]].astype(np.int32)
-    colors = np.array([CLASS_COLORS[c] for c in (1, 2, 3)], dtype=np.int32)
+    colors = np.array([CLASS_COLORS[c] for c in (1, 2, 3, 4)], dtype=np.int32)
     diff = rgb[:, :, None, :] - colors[None, None, :, :]
     dist = np.sum(diff * diff, axis=-1)  # int32: 255**2 * 3 fits easily, unlike int16
     nearest = np.argmin(dist, axis=-1).astype(np.uint8) + 1
@@ -141,6 +144,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
       <button class="btn" data-cls="1"><span class="swatch" style="background:rgb(255,0,0)"></span>Heart (1)</button>
       <button class="btn" data-cls="2"><span class="swatch" style="background:rgb(0,0,255)"></span>Head (2)</button>
       <button class="btn" data-cls="3"><span class="swatch" style="background:rgb(0,255,0)"></span>Life (3)</button>
+      <button class="btn" data-cls="4"><span class="swatch" style="background:rgb(255,200,0)"></span>Fate (4)</button>
       <button class="btn" data-cls="0"><span class="swatch" style="background:#444"></span>Eraser (0)</button>
       <label style="font-size:12px;">brush <input type="range" id="brush" min="1" max="30" value="5"><span id="brushVal">5</span></label>
       <button class="btn" id="undoBtn">Undo (Ctrl+Z)</button>
@@ -158,11 +162,11 @@ INDEX_HTML = r"""<!DOCTYPE html>
         <canvas id="drawCanvas"></canvas>
       </div>
     </div>
-    <div id="help">right-click: eraser&rarr;heart&rarr;head&rarr;life&rarr;save+next &middot; 1/2/3 class &middot; 0/E eraser &middot; [ ] brush size &middot; Ctrl+Z undo &middot; S save &middot; A approve &middot; X reject &middot; N/&rarr; next &middot; P/&larr; prev &middot; V toggle overlay</div>
+    <div id="help">right-click: eraser&rarr;heart&rarr;head&rarr;life&rarr;save+next &middot; 1/2/3/4 class &middot; 0/E eraser &middot; [ ] brush size &middot; Ctrl+Z undo &middot; S save &middot; A approve &middot; X reject &middot; N/&rarr; next &middot; P/&larr; prev &middot; V toggle overlay</div>
   </div>
 <script>
 (async function() {
-  const CLASS_COLORS = {0:[0,0,0],1:[255,0,0],2:[0,0,255],3:[0,255,0]};
+  const CLASS_COLORS = {0:[0,0,0],1:[255,0,0],2:[0,0,255],3:[0,255,0],4:[255,200,0]};
   const DISPLAY_SIZE = 700;
 
   let items = [];
@@ -409,6 +413,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
     if (e.key === '1') selectClass(1);
     else if (e.key === '2') selectClass(2);
     else if (e.key === '3') selectClass(3);
+    else if (e.key === '4') selectClass(4);
     else if (e.key === '0' || e.key.toLowerCase() === 'e') selectClass(0);
     else if (e.key === '[') { brush = Math.max(1, brush - 1); document.getElementById('brush').value = brush; document.getElementById('brushVal').textContent = brush; }
     else if (e.key === ']') { brush = Math.min(30, brush + 1); document.getElementById('brush').value = brush; document.getElementById('brushVal').textContent = brush; }

@@ -19,11 +19,11 @@ import torch
 from torch.utils.data import DataLoader
 
 from dataset import PalmLineDataset, build_train_transform, build_val_transform, split_stems
-from losses import FOREGROUND_CLASSES, NUM_CLASSES, PalmLineLoss
+from losses import LINE_NAMES, PalmLineLoss, line_classes
 from metrics import component_counts, dice_per_class, mean_skeleton_distance_px, single_component_rate
 from model import build_student_model
 
-CLASS_COLORS = {0: (0, 0, 0), 1: (255, 0, 0), 2: (0, 0, 255), 3: (0, 255, 0)}
+CLASS_COLORS = {0: (0, 0, 0), 1: (255, 0, 0), 2: (0, 0, 255), 3: (0, 255, 0), 4: (255, 200, 0)}
 IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
@@ -48,6 +48,25 @@ def parse_args() -> argparse.Namespace:
     ap.add_argument("--distance_max_px", type=float, default=32.0)
     ap.add_argument("--connectivity_weight", type=float, default=0.1)
     ap.add_argument("--connectivity_warmup_epochs", type=int, default=5)
+    ap.add_argument("--num_lines", type=int, choices=(3, 4), default=3, help="4 adds the fate line (mask value 4)")
+    ap.add_argument(
+        "--class_weights",
+        default="1,1,1,2",
+        help="comma-separated, background first; default doubles the life line, the weakest class of exp2. "
+        "Use one more value with --num_lines 4.",
+    )
+    ap.add_argument(
+        "--strong_aug",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="wide zoom/close-up/rotation and camera degradations (see dataset.py); --no-strong_aug is exp2",
+    )
+    ap.add_argument(
+        "--select_metric",
+        choices=("fg_dice", "min_line_dice"),
+        default="min_line_dice",
+        help="checkpoint selection; min_line_dice stops a strong heart/head average hiding a weak life line",
+    )
     ap.add_argument("--val_every", type=int, default=1)
     ap.add_argument("--save_every", type=int, default=10)
     ap.add_argument(
@@ -89,13 +108,13 @@ def save_overlay(image_chw: np.ndarray, pred_mask: np.ndarray, target_mask: np.n
 
 
 @torch.no_grad()
-def run_validation(model, loader, device, epoch, overlay_dir, overlay_samples, distance_max_px):
+def run_validation(model, loader, device, epoch, overlay_dir, overlay_samples, distance_max_px, num_classes, foreground):
     model.eval()
-    dice_sums = {c: 0.0 for c in range(NUM_CLASSES)}
+    dice_sums = {c: 0.0 for c in range(num_classes)}
     n_batches = 0
-    all_counts = {c: [] for c in FOREGROUND_CLASSES}
-    dist_sums = {c: 0.0 for c in FOREGROUND_CLASSES}
-    dist_n = {c: 0 for c in FOREGROUND_CLASSES}
+    all_counts = {c: [] for c in foreground}
+    dist_sums = {c: 0.0 for c in foreground}
+    dist_n = {c: 0 for c in foreground}
     overlays_saved = 0
 
     for images, targets in loader:
@@ -104,17 +123,17 @@ def run_validation(model, loader, device, epoch, overlay_dir, overlay_samples, d
         logits = model(images)
         pred = torch.argmax(logits, dim=1)
 
-        d = dice_per_class(pred, targets)
-        for c in range(NUM_CLASSES):
+        d = dice_per_class(pred, targets, num_classes)
+        for c in range(num_classes):
             dice_sums[c] += d[c]
         n_batches += 1
 
-        counts = component_counts(pred, FOREGROUND_CLASSES)
-        for c in FOREGROUND_CLASSES:
+        counts = component_counts(pred, foreground)
+        for c in foreground:
             all_counts[c].extend(counts[c])
 
-        dists = mean_skeleton_distance_px(pred, targets, FOREGROUND_CLASSES, distance_max_px)
-        for c in FOREGROUND_CLASSES:
+        dists = mean_skeleton_distance_px(pred, targets, foreground, distance_max_px)
+        for c in foreground:
             if not np.isnan(dists[c]):
                 dist_sums[c] += dists[c]
                 dist_n[c] += 1
@@ -134,9 +153,9 @@ def run_validation(model, loader, device, epoch, overlay_dir, overlay_samples, d
                 )
                 overlays_saved += 1
 
-    mean_dice = {c: dice_sums[c] / max(1, n_batches) for c in range(NUM_CLASSES)}
+    mean_dice = {c: dice_sums[c] / max(1, n_batches) for c in range(num_classes)}
     rates = single_component_rate(all_counts)
-    mean_dists = {c: (dist_sums[c] / dist_n[c] if dist_n[c] else float("nan")) for c in FOREGROUND_CLASSES}
+    mean_dists = {c: (dist_sums[c] / dist_n[c] if dist_n[c] else float("nan")) for c in foreground}
     return mean_dice, rates, mean_dists
 
 
@@ -150,6 +169,8 @@ def save_checkpoint(path, model, optimizer, scheduler, epoch, best_val_dice, arg
             "best_val_dice": best_val_dice,
             "encoder": args.encoder,
             "img_size": args.img_size,
+            "num_lines": args.num_lines,
+            "select_metric": args.select_metric,
         },
         path,
     )
@@ -174,7 +195,13 @@ def main() -> None:
     train_stems, val_stems = split_stems(args.data_dir, val_fraction=args.val_fraction, seed=args.seed)
     print(f"train: {len(train_stems)} samples, val: {len(val_stems)} samples")
 
-    train_ds = PalmLineDataset(args.data_dir, build_train_transform(args.img_size), stems=train_stems)
+    num_classes, foreground = line_classes(args.num_lines)
+    names = {c: LINE_NAMES[c - 1] for c in foreground}
+    class_weights = [float(v) for v in args.class_weights.split(",")] if args.class_weights else None
+
+    train_ds = PalmLineDataset(
+        args.data_dir, build_train_transform(args.img_size, strong=args.strong_aug), stems=train_stems
+    )
     val_ds = PalmLineDataset(args.data_dir, build_val_transform(args.img_size), stems=val_stems)
 
     train_loader = DataLoader(
@@ -194,16 +221,19 @@ def main() -> None:
     )
 
     model = build_student_model(
-        encoder_name=args.encoder, encoder_weights=("imagenet" if args.pretrained else None)
+        encoder_name=args.encoder, encoder_weights=("imagenet" if args.pretrained else None), classes=num_classes
     ).to(device)
     loss_fn = PalmLineLoss(
+        num_classes=num_classes,
+        foreground_classes=foreground,
+        class_weights=class_weights,
         cldice_weight=args.cldice_weight,
         distance_weight=args.distance_weight,
         distance_warmup_epochs=args.distance_warmup_epochs,
         distance_max_px=args.distance_max_px,
         connectivity_weight=args.connectivity_weight,
         connectivity_warmup_epochs=args.connectivity_warmup_epochs,
-    )
+    ).to(device)
 
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs)
@@ -231,15 +261,11 @@ def main() -> None:
         "train_distance",
         "train_connectivity",
         "val_dice_bg",
-        "val_dice_heart",
-        "val_dice_head",
-        "val_dice_life",
-        "single_comp_heart",
-        "single_comp_head",
-        "single_comp_life",
-        "dist_heart_px",
-        "dist_head_px",
-        "dist_life_px",
+        *[f"val_dice_{n}" for n in names.values()],
+        "val_fg_dice",
+        "val_min_line_dice",
+        *[f"single_comp_{n}" for n in names.values()],
+        *[f"dist_{n}_px" for n in names.values()],
         "lr",
         "seconds",
     ]
@@ -293,31 +319,37 @@ def main() -> None:
 
         if (epoch + 1) % args.val_every == 0 or epoch == args.epochs - 1:
             mean_dice, rates, mean_dists = run_validation(
-                model, val_loader, device, epoch, overlay_dir, args.overlay_samples, args.distance_max_px
+                model,
+                val_loader,
+                device,
+                epoch,
+                overlay_dir,
+                args.overlay_samples,
+                args.distance_max_px,
+                num_classes,
+                foreground,
             )
-            row.update(
-                {
-                    "val_dice_bg": mean_dice[0],
-                    "val_dice_heart": mean_dice[1],
-                    "val_dice_head": mean_dice[2],
-                    "val_dice_life": mean_dice[3],
-                    "single_comp_heart": rates[1],
-                    "single_comp_head": rates[2],
-                    "single_comp_life": rates[3],
-                    "dist_heart_px": mean_dists[1],
-                    "dist_head_px": mean_dists[2],
-                    "dist_life_px": mean_dists[3],
-                }
-            )
-            fg_dice = float(np.mean([mean_dice[c] for c in FOREGROUND_CLASSES]))
+            fg_dice = float(np.mean([mean_dice[c] for c in foreground]))
+            min_line_dice = float(min(mean_dice[c] for c in foreground))
+            row["val_dice_bg"] = mean_dice[0]
+            row["val_fg_dice"] = fg_dice
+            row["val_min_line_dice"] = min_line_dice
+            for c, n in names.items():
+                row[f"val_dice_{n}"] = mean_dice[c]
+                row[f"single_comp_{n}"] = rates[c]
+                row[f"dist_{n}_px"] = mean_dists[c]
             print(
                 f"epoch {epoch}: train_total={running['total']:.4f} val_fg_dice={fg_dice:.4f} "
-                f"single_comp(heart/head/life)={rates[1]:.2f}/{rates[2]:.2f}/{rates[3]:.2f} "
-                f"dist_px(heart/head/life)={mean_dists[1]:.1f}/{mean_dists[2]:.1f}/{mean_dists[3]:.1f}"
+                f"min_line_dice={min_line_dice:.4f} "
+                + " ".join(
+                    f"{n}(dice={mean_dice[c]:.3f} single={rates[c]:.2f} dist={mean_dists[c]:.1f}px)"
+                    for c, n in names.items()
+                )
             )
 
-            if fg_dice > best_val_dice:
-                best_val_dice = fg_dice
+            score = min_line_dice if args.select_metric == "min_line_dice" else fg_dice
+            if score > best_val_dice:
+                best_val_dice = score
                 save_checkpoint(ckpt_dir / "best.pt", model, optimizer, scheduler, epoch, best_val_dice, args)
         else:
             print(f"epoch {epoch}: train_total={running['total']:.4f}")
@@ -330,7 +362,7 @@ def main() -> None:
             save_checkpoint(ckpt_dir / f"epoch{epoch:04d}.pt", model, optimizer, scheduler, epoch, best_val_dice, args)
 
     log_file.close()
-    print(f"done. best val fg dice: {best_val_dice:.4f}. checkpoints in {ckpt_dir}")
+    print(f"done. best val {args.select_metric}: {best_val_dice:.4f}. checkpoints in {ckpt_dir}")
 
 
 if __name__ == "__main__":

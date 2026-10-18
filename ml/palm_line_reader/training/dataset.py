@@ -2,7 +2,8 @@
 
 Expects the directory generate_pseudo_labels.py produces:
     data_dir/images/<stem>.png     RGB crop, already resized to img_size
-    data_dir/masks/<stem>.png      single-channel class-index mask (0..3)
+    data_dir/masks/<stem>.png      single-channel class-index mask (0..3, or
+                                    0..4 when the fate line is labelled)
     data_dir/manifest.csv          stem, pass_filter, ... (rows with
                                     pass_filter != True are skipped, unless
                                     overridden by reviewed.csv below)
@@ -15,10 +16,16 @@ Expects the directory generate_pseudo_labels.py produces:
                                     verdict always overrides the heuristic.
 
 Augmentation is heavy on photometric transforms (webcam white balance varies
-wildly) plus mild rotation/crop jitter to tolerate imperfect MediaPipe crops,
-and a horizontal flip since geometry, not left/right hand identity, is what
-defines each line class. Normalization matches the mit_b0 encoder's
+wildly) and a horizontal flip since geometry, not left/right hand identity, is
+what defines each line class. Normalization matches the mit_b0 encoder's
 imagenet pretraining stats.
+
+Geometric jitter is wide on purpose (build_train_transform(strong=True)). The
+shipped model only saw scale 0.85-1.0 / +-10 degree jitter and fell apart on
+phone photos framed differently from MediaPipe crops: a palm-only close-up
+returned almost nothing until it was padded back out to whole-hand framing.
+So training now mixes in zoomed-out (padded) hands, palm-only close-ups,
+larger rotation, and the blur/noise/JPEG/exposure artefacts of booth cameras.
 """
 
 from __future__ import annotations
@@ -90,14 +97,45 @@ def split_stems(data_dir: str, val_fraction: float = 0.1, seed: int = 0) -> Tupl
     return stems[n_val:], stems[:n_val]
 
 
-def build_train_transform(img_size: int = 512) -> A.Compose:
-    return A.Compose(
-        [
+def build_train_transform(img_size: int = 512, strong: bool = True) -> A.Compose:
+    if not strong:  # the original exp2 recipe, kept for ablations
+        geometric = [
             A.HorizontalFlip(p=0.5),
             A.Rotate(limit=10, border_mode=cv2.BORDER_CONSTANT, value=0, mask_value=0, p=0.7),
             A.RandomResizedCrop(height=img_size, width=img_size, scale=(0.85, 1.0), ratio=(0.95, 1.05), p=0.5),
+        ]
+        degradations = []
+    else:
+        pad = dict(mode=cv2.BORDER_CONSTANT, cval=0, cval_mask=0)
+        geometric = [
+            A.HorizontalFlip(p=0.5),
+            A.OneOf(
+                [
+                    # zoomed-out: hand small in frame, background padding around it
+                    A.Affine(scale=(0.55, 0.9), translate_percent=(-0.1, 0.1), rotate=(-25, 25), **pad),
+                    # roughly the training framing, wider rotation than before
+                    A.Affine(scale=(0.9, 1.15), translate_percent=(-0.05, 0.05), rotate=(-25, 25), **pad),
+                    # palm-only close-up: fingers and wrist cropped away
+                    A.RandomResizedCrop(size=(img_size, img_size), scale=(0.3, 0.6), ratio=(0.8, 1.25)),
+                ],
+                p=0.85,
+            ),
+        ]
+        degradations = [
+            A.OneOf([A.MotionBlur(blur_limit=7), A.GaussianBlur(blur_limit=(3, 7)), A.Defocus(radius=(1, 3))], p=0.3),
+            A.GaussNoise(var_limit=(5.0, 40.0), p=0.25),
+            A.ImageCompression(quality_range=(35, 95), p=0.3),
+            # Soft exposure changes only: RandomShadow's hard-edged polygons look like creases.
+            A.OneOf([A.RandomGamma(gamma_limit=(70, 140)), A.RandomBrightnessContrast(0.25, 0.25)], p=0.3),
+            A.CLAHE(clip_limit=2.0, p=0.1),
+        ]
+    return A.Compose(
+        [
+            *geometric,
             A.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.05, p=0.8),
             A.RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15, p=0.5),
+            *degradations,
+            A.Resize(img_size, img_size),
             A.Normalize(mean=IMAGENET_MEAN, std=IMAGENET_STD),
             ToTensorV2(),
         ]

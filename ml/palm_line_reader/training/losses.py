@@ -19,6 +19,10 @@ topology and geometry, not just per-pixel overlap:
   - Connectivity regularizer: penalizes predicted probability mass that
     falls outside the largest connected component per line class, gated by
     a warmup so early noisy predictions aren't over-penalized.
+
+Every term accepts per-class weights. The shipped model's weakest class is the
+life line (teacher pseudo-labels draw it short on RGB photos), so train.py
+defaults to weighting it up instead of averaging all lines equally.
 """
 
 from __future__ import annotations
@@ -31,16 +35,34 @@ import torch.nn as nn
 import torch.nn.functional as F
 from scipy import ndimage
 
+LINE_NAMES = ("heart", "head", "life", "fate")
 NUM_CLASSES = 4
 FOREGROUND_CLASSES: Sequence[int] = (1, 2, 3)  # heart, head, life
 
 
-def dice_loss(probs: torch.Tensor, target_onehot: torch.Tensor, smooth: float = 1.0) -> torch.Tensor:
+def line_classes(num_lines: int) -> tuple[int, Sequence[int]]:
+    """(num_classes, foreground class indices) for 3 lines, or 4 with the fate line."""
+    if num_lines not in (3, 4):
+        raise ValueError("num_lines must be 3 (heart/head/life) or 4 (+fate)")
+    return num_lines + 1, tuple(range(1, num_lines + 1))
+
+
+def _weighted_mean(values: Sequence[torch.Tensor], weights: Sequence[float] | None) -> torch.Tensor:
+    stacked = torch.stack(list(values))
+    if weights is None:
+        return stacked.mean()
+    w = stacked.new_tensor(list(weights))
+    return (stacked * w).sum() / w.sum()
+
+
+def dice_loss(
+    probs: torch.Tensor, target_onehot: torch.Tensor, smooth: float = 1.0, weights: Sequence[float] | None = None
+) -> torch.Tensor:
     dims = (0, 2, 3)
     intersection = torch.sum(probs * target_onehot, dims)
     cardinality = torch.sum(probs + target_onehot, dims)
     dice = (2.0 * intersection + smooth) / (cardinality + smooth)
-    return 1.0 - dice.mean()
+    return 1.0 - _weighted_mean(dice, weights)
 
 
 def _soft_erode(img: torch.Tensor) -> torch.Tensor:
@@ -75,6 +97,7 @@ def cldice_loss(
     classes: Sequence[int] = FOREGROUND_CLASSES,
     iterations: int = 10,
     smooth: float = 1.0,
+    weights: Sequence[float] | None = None,
 ) -> torch.Tensor:
     per_class = []
     for c in classes:
@@ -86,7 +109,7 @@ def cldice_loss(
         tsens = (torch.sum(skel_t * p) + smooth) / (torch.sum(skel_t) + smooth)
         cl = 1.0 - 2.0 * (tprec * tsens) / (tprec + tsens + 1e-8)
         per_class.append(cl)
-    return torch.stack(per_class).mean()
+    return _weighted_mean(per_class, weights)
 
 
 def _target_skeleton_distance_maps(skel_t: torch.Tensor, max_distance: float) -> torch.Tensor:
@@ -116,6 +139,7 @@ def skeleton_distance_loss(
     classes: Sequence[int] = FOREGROUND_CLASSES,
     iterations: int = 10,
     max_distance: float = 32.0,
+    weights: Sequence[float] | None = None,
 ) -> torch.Tensor:
     """Chamfer-style distance from predicted skeleton mass to the true line.
 
@@ -132,7 +156,7 @@ def skeleton_distance_loss(
         weighted = (skel_p * dist_map).sum(dim=(1, 2, 3))
         norm = skel_p.sum(dim=(1, 2, 3)) + 1.0
         per_class.append((weighted / norm).mean() / max_distance)
-    return torch.stack(per_class).mean()
+    return _weighted_mean(per_class, weights)
 
 
 def connectivity_regularizer(
@@ -185,8 +209,11 @@ class PalmLineLoss(nn.Module):
         connectivity_weight: float = 0.1,
         connectivity_warmup_epochs: int = 5,
         skeleton_iterations: int = 10,
+        class_weights: Sequence[float] | None = None,
     ) -> None:
         super().__init__()
+        if class_weights is not None and len(class_weights) != num_classes:
+            raise ValueError(f"class_weights needs {num_classes} values (background first)")
         self.num_classes = num_classes
         self.foreground_classes = foreground_classes
         self.cldice_weight = cldice_weight
@@ -196,7 +223,11 @@ class PalmLineLoss(nn.Module):
         self.connectivity_weight = connectivity_weight
         self.connectivity_warmup_epochs = connectivity_warmup_epochs
         self.skeleton_iterations = skeleton_iterations
-        self.ce = nn.CrossEntropyLoss()
+        # CE takes the full per-class vector; the line-only terms take the foreground slice.
+        weights = torch.tensor(class_weights, dtype=torch.float32) if class_weights is not None else None
+        self.ce = nn.CrossEntropyLoss(weight=weights)
+        self.class_weights = list(class_weights) if class_weights is not None else None
+        self.line_weights = [self.class_weights[c] for c in foreground_classes] if class_weights is not None else None
         self.epoch = 0
 
     def set_epoch(self, epoch: int) -> None:
@@ -207,15 +238,22 @@ class PalmLineLoss(nn.Module):
         target_onehot = F.one_hot(target, self.num_classes).permute(0, 3, 1, 2).float()
 
         ce = self.ce(logits, target)
-        dice = dice_loss(probs, target_onehot)
-        cldice = cldice_loss(probs, target_onehot, self.foreground_classes, self.skeleton_iterations)
+        dice = dice_loss(probs, target_onehot, weights=self.class_weights)
+        cldice = cldice_loss(
+            probs, target_onehot, self.foreground_classes, self.skeleton_iterations, weights=self.line_weights
+        )
 
         total = ce + dice + self.cldice_weight * cldice
 
         dist = probs.new_zeros(())
         if self.distance_weight > 0 and self.epoch >= self.distance_warmup_epochs:
             dist = skeleton_distance_loss(
-                probs, target_onehot, self.foreground_classes, self.skeleton_iterations, self.distance_max_px
+                probs,
+                target_onehot,
+                self.foreground_classes,
+                self.skeleton_iterations,
+                self.distance_max_px,
+                weights=self.line_weights,
             )
             total = total + self.distance_weight * dist
 

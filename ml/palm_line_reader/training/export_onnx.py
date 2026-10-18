@@ -48,14 +48,16 @@ def load_model(checkpoint_path: str, encoder_override: str | None, img_size_over
         state = ckpt["model"]
         encoder = ckpt.get("encoder", "mit_b0")
         img_size = ckpt.get("img_size", 512)
+        num_lines = ckpt.get("num_lines", 3)
     else:
         state = ckpt
         encoder = "mit_b0"
         img_size = 512
+        num_lines = 3
     encoder = encoder_override or encoder
     img_size = img_size_override or img_size
 
-    model = build_student_model(encoder_name=encoder, encoder_weights=None)
+    model = build_student_model(encoder_name=encoder, encoder_weights=None, classes=num_lines + 1)
     model.load_state_dict(state)
     model.eval()
     return model, encoder, img_size
