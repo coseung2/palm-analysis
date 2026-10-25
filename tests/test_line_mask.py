@@ -33,7 +33,7 @@ def test_observation_keeps_originals_and_labels_overlay_untrusted(monkeypatch):
         photo = PreparedImage(data=b'overview', digest='a'*64, palm_detail=b'crop')
         calls = []
         class Probe(ClaudeAnalyzer):
-            async def _generate(self, system, content, model):
+            async def _generate(self, system, content, model, light=False):
                 calls.append(content)
                 return 'observed'
         monkeypatch.setattr('palm_backend.line_mask.line_overlay', lambda photo, path: b'overlay')

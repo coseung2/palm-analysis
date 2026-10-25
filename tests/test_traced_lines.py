@@ -1,12 +1,14 @@
 import asyncio
 import io
+import json
 
+import httpx
 from PIL import Image
 
 from palm_backend.config import Settings
 from palm_backend.images import PreparedImage
-from palm_backend.models import LineObservation, Observation
-from palm_backend.providers import ClaudeAnalyzer
+from palm_backend.models import BoothConfig, LineObservation, LineReading, Observation, Story
+from palm_backend.providers import ClaudeAnalyzer, OCXAnalyzer
 from palm_backend.traced_lines import (
     apply_traces,
     render_traces,
@@ -70,12 +72,13 @@ def test_observation_uses_tracer_and_falls_back_to_model_traces(monkeypatch):
     async def run():
         config = Settings(_env_file=None, operator_key='test-only-operator-key-at-least-32-characters',
                           line_model_path='test-only.pth', line_tracer_model_path='test-only.pt')
-        image = PreparedImage(data=photo(), digest='a' * 64, palm_detail=b'crop')
-        calls = []
+        image = PreparedImage(data=photo(), digest='a' * 64, palm_detail=b'crop', enhanced_detail=b'map')
+        calls, lights = [], []
 
         class Probe(ClaudeAnalyzer):
-            async def _generate(self, system, content, model):
+            async def _generate(self, system, content, model, light=False):
                 calls.append(content)
+                lights.append(light)
                 return observation()
 
         monkeypatch.setattr('palm_backend.line_mask.line_overlay', lambda photo, path: b'overlay')
@@ -86,12 +89,41 @@ def test_observation_uses_tracer_and_falls_back_to_model_traces(monkeypatch):
         assert result.lines[1].trace == []
         texts = [b.get('text', '') for b in calls[0]]
         assert any('추적된 선: life' in text and 'trace는 빈 배열' in text for text in texts)
-        # Overview, crop and tracer drawing; the older crease overlay is not sent alongside.
+        # Overview, crop and tracer drawing; neither the crease map nor the older overlay is sent,
+        # and the lighter reasoning effort is requested.
         assert len([b for b in calls[0] if b['type'] == 'image']) == 3
-        assert not any('실험적 주름 후보' in text for text in texts)
+        assert not any('실험적 주름 후보' in text or 'Meijering' in text for text in texts)
+        assert lights[0] is True
 
         monkeypatch.setattr('palm_backend.traced_lines.trace_lines', lambda photo, path: None)
         result = await Probe(config, None).observe(image)
         assert result == observation()
         assert any('실험적 주름 후보' in b.get('text', '') for b in calls[1])
+        assert any('Meijering' in b.get('text', '') for b in calls[1])
+        assert lights[1] is False
+    asyncio.run(run())
+
+
+def test_ocx_uses_lighter_effort_for_traced_observation_and_narration(monkeypatch):
+    async def run():
+        bodies = []
+
+        def handler(request):
+            bodies.append(json.loads(request.content))
+            value = observation() if len(bodies) == 1 else Story(
+                readings=[LineReading(name=name, reading='r') for name in ('life', 'head', 'heart', 'fate')],
+                visions=['v'])
+            return httpx.Response(200, json={'status': 'completed', 'output': [
+                {'type': 'message', 'content': [{'type': 'output_text', 'text': value.model_dump_json()}]}]})
+
+        config = Settings(_env_file=None, operator_key='test-only-operator-key-at-least-32-characters',
+                          analysis_mode='ocx', ocx_base_url='https://ocx.test', ocx_api_key='test-only-key',
+                          line_tracer_model_path='test-only.pt')
+        monkeypatch.setattr('palm_backend.traced_lines.trace_lines',
+                            lambda photo, path: {'life': [(.3, .4), (.5, .6)]})
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            analyzer = OCXAnalyzer(config, client)
+            observed = await analyzer.observe(PreparedImage(data=photo(), digest='a' * 64))
+            await analyzer.narrate(observed, BoothConfig())
+        assert [body['reasoning'] for body in bodies] == [{'effort': 'low'}, {'effort': 'low'}]
     asyncio.run(run())

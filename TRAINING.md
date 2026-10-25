@@ -229,6 +229,7 @@ Windows에서는 데이터로더 워커마다 CUDA DLL이 올라가 페이징 �
    - 근거(2026-10-25): 첫 VM 종단 실행에서 기준상 4선이 모두 보이는 사진 2의 3선을 AI가 unclear/not_visible로 판정해 1선만 그려졌다. PLSU 검증 103장에서 lines-01이 라벨 없는 곳에 선을 그린 횟수는 life 4·head 0·heart 0·fate 34라 fate만 AI 확인을 유지한다.
    - 대상 3장에서 visible 라벨의 life·head·heart는 모두 추적됐다(F1 0.69~1.0, 누락 없음). 같은 종단 판정에 새 규칙을 적용하면 사진 2는 life·head·heart 3선이 그려진다(fate는 AI가 not_visible로 판정해 제외). 바뀐 프롬프트에 대한 실제 AI 응답은 아직 확인하지 않았다.
 4. 의존성 부재·손 미검출·해시 불일치·예외 시 `None`을 반환해 기존 AI 좌표 경로로 돌아간다.
+5. 지연 단축(2026-10-25): 추적에 성공하면 Meijering 주름 지도를 보내지 않고, 관찰 호출의 추론 강도를 `PALM_OCX_TRACED_OBSERVATION_EFFORT`(기본 low)로 낮춘다. 해석 호출도 `PALM_OCX_NARRATION_EFFORT`(기본 low)를 명시한다. 추적 실패 시 관찰은 기존 `PALM_OCX_OBSERVATION_EFFORT`(기본 high)와 주름 지도를 그대로 쓴다. 근거: 2번째 VM 종단 실행에서 소비자 31.2초 중 관찰 호출이 19.9초였다.
 
 로컬 검증: 학습 venv(CUDA torch, CPU로 추론)에서 서버 함수 `trace_lines`의 사진 좌표 출력을 저장된 랜드마크로 정규 좌표계에 되돌려 대상 3장을 채점했다. 4선 평균 0.918(오프라인 추적기 같은 기준 0.921, 감정선 사진 2는 24점 추출 후 0.69→0.64). 지연은 이 PC CPU에서 사진당 2.8~3.7초, 첫 호출은 import·모델 로드·검출기 시작으로 약 15초(디스크 콜드 상태에서 52초 관측)라 앱·클라우드 워커 시작 시 백그라운드 warm-up을 한다. 실제 AI 호출을 포함한 종단 실행과 VM(ARM64) 측정은 하지 않았다. VM 반영에는 mediapipe·opencv-contrib·scikit-image·scipy·segmentation-models-pytorch·timm 설치(ARM64 휠 확인), 체크포인트 배치, 지연·메모리 측정, 앱 경로의 `analysis_timeout_seconds`(45초) 내 여유 확인이 필요하다.
 

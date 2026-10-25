@@ -154,6 +154,7 @@ def test_real_adapter_stage_boundaries_with_synthetic_image_and_mock_gateway(cap
                 timing.mark_outcome('completed')
         assert len(calls)==2
         assert calls[0]['reasoning']=={'effort':'high'}
+        assert calls[1]['reasoning']=={'effort':'low'}
         assert calls[0]['store'] is False and calls[1]['store'] is False
     with caplog.at_level(logging.INFO,logger=timing.LOGGER.name):
         asyncio.run(run())
