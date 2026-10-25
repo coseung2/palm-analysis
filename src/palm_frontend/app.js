@@ -20,7 +20,7 @@ const state = {
   screen: 'welcome', serviceReady: false, temporaryPhotoStorage: false,
   sound: false, cameraOn: false, consent: false, photo: null, photoError: '',
   scanText: '손에 남은 흔적을 살피고 있습니다.', transiting: false,
-  result: null, chapter: 'present', lineIndex: 0, visionIndex: 0,
+  result: null, lineIndex: 0,
   error: '', dialog: null, busy: false,
 };
 let generation = 0;
@@ -44,10 +44,6 @@ function releasePhoto() {
 function stopSound() { portalSound.pause(); portalSound.currentTime = 0; }
 function stopCapture() { camera.stop(); state.cameraOn = false; }
 function lineName(index = state.lineIndex) { return LINE_ORDER[index]; }
-function showLandscape() {
-  const motif = state.chapter === 'present' ? lineName() : state.chapter;
-  scene()?.[state.chapter === 'present' ? 'line' : 'chapter']?.(motif);
-}
 
 const actions = {
   begin() { if (state.serviceReady) go('capture'); },
@@ -107,19 +103,11 @@ const actions = {
   openAbout() { state.dialog = {title: '체험 안내', text: aboutText(state)}; draw(); },
   openPrivacy() { state.dialog = {title: '사진 처리 안내', text: privacyText(state)}; draw(); },
   closeDialog() { state.dialog = null; draw(); },
-  chapter(next) {
-    state.chapter = next;
-    draw();
-    showLandscape();
-    document.getElementById(`chapter-${next}`)?.focus({preventScroll: true});
-  },
-  nextChapter() { actions.chapter(state.chapter === 'present' ? 'past' : 'future'); },
   line(index) {
     state.lineIndex = index;
     draw();
     scene()?.line(lineName());
   },
-  vision(index) { state.visionIndex = index; draw(); },
   analyze() { readPalm(); },
 };
 
@@ -182,7 +170,7 @@ async function readPalm() {
     if (run !== generation) return;
     // Keep only the tab-local preview URL for the result overlay; leaving revokes it.
     if (state.photo) state.photo.file = null;
-    go('reading', {result: view.result, chapter: 'present', lineIndex: 0, visionIndex: 0});
+    go('reading', {result: view.result, lineIndex: 0});
   } catch (error) {
     if (run !== generation) return;
     releasePhoto();

@@ -21,7 +21,8 @@ test('map keeps original photo, selected line, SVG namespace and no invented tra
     assert.equal(svg.attrs.preserveAspectRatio,'none');
     assert.equal(svg.children.length,1);
     assert.match(svg.children[0].attrs.class,/selected/);
-    assert.match(map.children[1].textContent,/추정/);
+    assert.equal(map.children.length,1);  // no caption when lines are drawn
+    assert.match(renderPalmMap('blob:test-only',{lines:[{name:'heart',visibility:'unclear'}]},'life').children[1].textContent,/임의의 선은 그리지 않습니다/);
     assert.equal(renderPalmMap(null,result,'life').children.length,1);
   } finally {
     if(previous===undefined) delete globalThis.document;else globalThis.document=previous;

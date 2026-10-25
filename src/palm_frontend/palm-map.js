@@ -44,10 +44,11 @@ export function renderPalmMap(photoUrl, result, selected) {
     svg.append(group);
   }
   frame.append(photo, svg);
-  const caption = document.createElement('figcaption');
-  caption.textContent = count
-    ? '색선은 AI가 원본 사진에서 추정한 위치입니다. 불명확한 선은 표시하지 않습니다. 사진은 이 탭에서만 표시됩니다.'
-    : '이 사진에서는 표시할 선 좌표를 얻지 못했습니다. 임의의 선은 그리지 않습니다.';
-  figure.append(frame, caption);
+  figure.append(frame);
+  if (!count) {
+    const caption = document.createElement('figcaption');
+    caption.textContent = '이 사진에서는 표시할 선 좌표를 얻지 못했습니다. 임의의 선은 그리지 않습니다.';
+    figure.append(caption);
+  }
   return figure;
 }

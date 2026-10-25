@@ -1,5 +1,5 @@
-import {ABOUT_FALLBACK, CHAPTERS, LINE_MARKS, LINE_NAMES, LINE_ORDER, VISIBILITY, privacyCopy} from './copy.js';
-import {renderPalmMap, tracePoints} from './palm-map.js';
+import {ABOUT_FALLBACK, LINE_MARKS, LINE_NAMES, LINE_ORDER, privacyCopy} from './copy.js';
+import {renderPalmMap} from './palm-map.js';
 
 const el = (tag, props = {}, ...children) => {
   const node = document.createElement(tag);
@@ -38,8 +38,7 @@ function welcome(state, actions) {
       el('button', {id: 'start', class: 'cta', disabled: !state.serviceReady || undefined, onclick: actions.begin}, el('span', {text: '내 손금 들여다보기'}), el('span', {'aria-hidden': 'true', text: '↗'})),
       state.serviceReady ? null : el('p', {class: 'entry-note', text: '지금은 이용할 수 없습니다. 잠시 후 다시 찾아 주세요.'}),
       state.serviceReady ? el('p', {class: 'entry-note', text: '손끝에서 시작하는 작은 여행'}) : null),
-    el('div', {class: 'orbital-label', 'aria-hidden': 'true'}, el('span', {text: '손금의 꿈'}), el('span', {text: '선과 선 사이, 잠시 머무는 꿈'})),
-    el('div', {class: 'journey-index'}, el('span', {class: 'index-label', text: 'THE JOURNEY'}), ...CHAPTERS.map(chapter => el('span', {}, el('i', {text: chapter.numeral}), ` ${chapter.label}`))));
+    el('div', {class: 'orbital-label', 'aria-hidden': 'true'}, el('span', {text: '손금의 꿈'}), el('span', {text: '선과 선 사이, 잠시 머무는 꿈'})));
 }
 
 function capture(state, actions) {
@@ -90,65 +89,26 @@ function scan(state, actions) {
 }
 
 function reading(state, actions) {
-  const chapter = CHAPTERS.find(item => item.id === state.chapter);
   const lines = LINE_ORDER.map(name => state.result.lines.find(line => line.name === name));
   const line = lines[state.lineIndex];
   return el('section', {id: 'reading', class: 'screen reading', 'aria-labelledby': 'resultTitle'},
-    el('div', {class: 'reading-top'}, el('p', {class: 'kicker', text: '03 / BEYOND THE PALM'}), el('span', {id: 'hand', class: 'kicker', text: {left: '왼손', right: '오른손'}[state.result.hand] || ''})),
-    el('nav', {class: 'chapter-nav', 'aria-label': '이야기 장'}, ...CHAPTERS.map(item =>
-      el('button', {id: `chapter-${item.id}`, type: 'button', 'aria-current': item.id === state.chapter ? 'true' : null, onclick: () => actions.chapter(item.id)}, `${item.numeral} `, el('span', {text: item.label})))),
+    el('div', {class: 'reading-top'}, el('p', {class: 'kicker', text: '03 / YOUR PALM'}), el('span', {id: 'hand', class: 'kicker', text: {left: '왼손', right: '오른손'}[state.result.hand] || ''})),
     el('div', {class: 'story-layout'},
       el('div', {class: 'story-heading'},
-        el('p', {id: 'chapterEyebrow', class: 'kicker', text: chapter.eyebrow}),
-        el('h2', {id: 'resultTitle'}, chapter.title[0], el('br'), el('em', {text: chapter.title[1]}))),
+        el('h2', {id: 'resultTitle'}, '손에 새겨진', el('br'), el('em', {text: '당신의 선.'}))),
       el('div', {class: 'story-content', id: 'storyContent', tabindex: '-1'},
-        state.chapter === 'present' ? present(state, actions, lines, line) : null,
-        state.chapter === 'past' ? past(state, actions) : null,
-        state.chapter === 'future' ? future(state) : null)),
+        el('nav', {id: 'lineTabs', class: 'line-tabs', 'aria-label': '손금 선택'}, ...lines.map((item, index) =>
+          el('button', {type: 'button', 'data-reading-line': item.name, 'aria-pressed': String(index === state.lineIndex), onclick: () => actions.line(index)},
+            el('span', {class: `line-key trace-${item.name}`, 'aria-hidden': 'true'}), `${LINE_MARKS[item.name]} ${LINE_NAMES[item.name]}`))),
+        renderPalmMap(state.photo?.url, state.result, line.name),
+        el('div', {id: 'storyLines', 'aria-live': 'polite'},
+          el('section', {class: 'story-line', 'data-line': line.name},
+            el('div', {class: 'line-header'}, el('span', {class: 'line-symbol', text: LINE_MARKS[line.name]}), el('h3', {text: LINE_NAMES[line.name]})),
+            el('p', {class: 'line-reading', text: line.reading}))))),
     el('div', {class: 'reading-bottom'},
       el('div', {class: 'footer'},
         el('button', {id: 'again', class: 'text-button', type: 'button', onclick: actions.retake, text: '다시 촬영'}),
-        state.chapter === 'future' ? null : el('button', {id: 'nextChapter', class: 'ghost', type: 'button', onclick: actions.nextChapter, text: '다음 장으로 →'}),
-        state.chapter === 'future' ? el('button', {id: 'done', class: 'ghost', type: 'button', onclick: actions.finish, text: '여행 마치기 ↗'}) : null)));
-}
-
-function present(state, actions, lines, line) {
-  return [
-    el('nav', {id: 'lineTabs', class: 'line-tabs', 'aria-label': '손금 선택'}, ...lines.map((item, index) =>
-      el('button', {type: 'button', 'data-reading-line': item.name, 'aria-pressed': String(index === state.lineIndex), onclick: () => actions.line(index)},
-        el('span', {class: `line-key trace-${item.name}`, 'aria-hidden': 'true'}), `${LINE_MARKS[item.name]} ${LINE_NAMES[item.name]}`))),
-    renderPalmMap(state.photo?.url, state.result, line.name),
-    el('p', {class: 'fine', text: tracePoints(line).length ? `${LINE_NAMES[line.name]}의 추정 위치를 강조했습니다.` : `${LINE_NAMES[line.name]}: 위치 표시 보류`}),
-    el('div', {id: 'storyLines', 'aria-live': 'polite'},
-      el('section', {class: 'story-line', 'data-line': line.name},
-        el('div', {class: 'line-header'}, el('span', {class: 'line-symbol', text: LINE_MARKS[line.name]}), el('h3', {text: LINE_NAMES[line.name]}), el('span', {class: 'trait', text: line.trait})),
-        el('p', {class: 'line-reading', text: line.reading}),
-        el('details', {}, el('summary', {text: '선의 흔적 살펴보기'}), el('p', {text: line.description}), el('p', {class: 'fine', text: VISIBILITY[line.visibility]})))),
-    pager('line', state.lineIndex, lines.length, actions.line),
-  ];
-}
-
-function past(state, actions) {
-  const visions = state.result.visions;
-  return el('div', {id: 'visionContent'},
-    el('p', {id: 'vision', class: 'vision-text', text: visions[state.visionIndex] || ''}),
-    pager('vision', state.visionIndex, visions.length, actions.vision));
-}
-
-function future(state) {
-  const fate = state.result.lines.find(line => line.name === 'fate');
-  const head = state.result.lines.find(line => line.name === 'head');
-  return el('div', {id: 'futureContent'},
-    el('p', {class: 'future-quote', text: fate.reading}),
-    head ? el('p', {class: 'future-support', text: head.reading}) : null);
-}
-
-function pager(name, index, total, move) {
-  const labels = {line: ['이전 손금', '다음 손금'], vision: ['이전 기억', '다음 기억']};
-  return el('div', {id: name === 'line' ? 'lineNavigation' : null, class: 'vision-navigation'},
-    el('button', {id: `${name}Previous`, class: 'text-button', type: 'button', 'aria-label': labels[name][0], disabled: index === 0 || undefined, onclick: () => move(index - 1), text: '←'}),
-    el('span', {id: `${name}Count`, class: 'kicker', text: `${String(index + 1).padStart(2, '0')} / ${String(total).padStart(2, '0')}`}),
-    el('button', {id: `${name}Next`, class: 'text-button', type: 'button', 'aria-label': labels[name][1], disabled: index >= total - 1 || undefined, onclick: () => move(index + 1), text: '→'}));
+        el('button', {id: 'done', class: 'ghost', type: 'button', onclick: actions.finish, text: '처음으로 ↗'}))));
 }
 
 function failure(state, actions) {

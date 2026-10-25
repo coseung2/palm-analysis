@@ -14,6 +14,12 @@
       "port": 8787
     },
     {
+      "name": "layout-preview",
+      "runtimeExecutable": "C:\\Users\\coseung2\\Desktop\\Projects\\palm-analysis\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "http.server", "8002", "--bind", "127.0.0.1"],
+      "port": 8002
+    },
+    {
       "name": "palm-isolated-preview",
       "runtimeExecutable": "C:\\Users\\coseung2\\Desktop\\Projects\\palm-analysis\\.venv\\Scripts\\python.exe",
       "runtimeArgs": ["scripts/preview.py"],
