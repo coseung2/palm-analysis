@@ -104,6 +104,13 @@ def test_observation_uses_tracer_and_falls_back_to_model_traces(monkeypatch):
     asyncio.run(run())
 
 
+def test_system_prompts_mention_json_for_json_object_providers():
+    # DeepSeek (via OCX json_object mode) rejects prompts that never mention JSON.
+    from palm_backend.providers import OBSERVATION_SYSTEM, STORY_SYSTEM
+
+    assert 'json' in OBSERVATION_SYSTEM.lower() and 'json' in STORY_SYSTEM.lower()
+
+
 def test_ocx_uses_lighter_effort_for_traced_observation_and_narration(monkeypatch):
     async def run():
         bodies = []
