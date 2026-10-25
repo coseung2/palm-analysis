@@ -71,7 +71,7 @@
 ## 롤백과 보존
 
 - 시연 Worker의 확인된 현재 배포 버전: `df930396-15c7-447b-8885-49e7887064d1` (2026-10-11). 기존 시연 배포를 갱신하지 않았다.
-- 개발 Worker: https://palm-analysis-development.mdownloader.workers.dev . 2026-10-19 KST 배포 버전은 `d54c1504-960c-44ff-ae67-af14e151410f`, 앱 소스는 `06f71bb5d63bd3d792494120d05a54030548bd77` (`work/palm-booth`)다. 유료 플랜 변경·production 승격은 하지 않았다.
+- 개발 Worker: https://palm-analysis-development.mdownloader.workers.dev . 2026-10-19 KST 배포 버전은 `d54c1504-960c-44ff-ae67-af14e151410f`, 앱 소스는 `06f71bb5d63bd3d792494120d05a54030548bd77` (`work/palm-booth`)다. 2026-10-25 KST 사용자 요청으로 결과 화면을 "사진 위 선 + 선별 해석"만 남기도록 줄인 `c8c0b4b`를 배포했다(버전 `0f904697-02e8-4ea2-9654-32cabffa19a8`). Worker 코드는 그대로이고 웹 자산만 바뀌었다. 배포된 `app.js`가 로컬 빌드와 바이트 단위로 같음을 확인했다. 유료 플랜 변경·production 승격은 하지 않았다.
 - 같은 앱 소스를 VM에 반영하고 `palm-analysis-development.service`가 active/running 및 NRestarts=0임을 확인했다. 배포 전 소스/패키지 목록은 VM `data/releases/06f71bb/`에 보존한다. `.env`·머신 인증·서비스 설정·모델 파일은 덮어쓰지 않았다.
 - 로컬 Python 110개·JS 56개, VM 배포 후보 관련 Python 51개 테스트 통과. VM 합성 주름 입력에서 원본+Meijering PNG 동시 요청 구성 확인. 배포 HTTPS health, 정적 자산의 커밋 바이트 일치, 사진 없는 세션 생성/조회/취소 확인. 브라우저 도구 일시 장애로 이번 배포의 화면 재검증은 하지 못했다.
 - 확인 당시 UTC 일일 dispatch는 20회 중 19회 사용, reserved=0·진행 작업=0·삭제 대기=0. 한도는 변경하지 않았고 새 분석은 2회 예약이 필요하므로 배포 후 실제 AI 호출 검증은 생략했다.
