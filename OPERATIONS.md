@@ -91,14 +91,16 @@
 - **실제 데이터 학습·정확도 비교·새 가중치 서비스 활성화는 미완료**다. Roboflow 접근/라벨/권한 확인 또는 별도 학습 동의를 받은 부스 정답셋이 필요하다. 학습 데이터가 없는 상태에서 생성한 합성 테스트 모델은 실제 분석에 사용하지 않는다. production 차단을 유지한다.
 - 상세 입력 계약·명령·검증 한계는 [TRAINING.md](TRAINING.md)를 참고한다. 신규 파일은 Git commit/push하지 않은 상태에서 사용자 승인에 따라 VM에 추가했으며 릴리스 기록은 파일 해시를 기준으로 한다.
 
-## 로컬 선 추적기 VM 반영 준비 (2026-10-25 KST, 미활성)
+## 로컬 선 추적기 VM 반영 (2026-10-25 KST, 개발 서비스 활성)
 
 - 사용자 승인 후 커밋 `03a5cf6`의 추적기 연결 소스(`traced_lines.py`, `line_tracer.py`, `palm_training` 전체, 워커 래퍼, 관련 테스트, TRAINING.md)를 VM에 반영했다. 반영 전 VM 파일은 빈 줄을 제외하면 `982c6c3`과 일치함을 확인했다. 백업과 스테이징 파일·해시: `data/releases/tracer-20261025T081338Z/`(UTC).
 - VM `.venv`에 segmentation-models-pytorch 0.5.0, timm 1.0.30, torchvision 0.23.0과 의존 패키지(huggingface_hub, safetensors, PyYAML, tqdm, hf-xet, httpx2, httpcore2, truststore)만 추가했다. torch 2.8.0·numpy 1.26.4·httpx 0.28.1을 포함한 기존 패키지는 바뀌지 않았고, 설치 전후 freeze를 같은 디렉터리에 보존했다. `pip check` 이상 없음.
 - 체크포인트 `data/models/palm-tracer-lines-01.pt`(SHA256 `c19e0056…98ce`, 권한 600). PLSU(명시 라이선스 없음)로 만든 의사라벨로 학습한 개인 실험용 가중치이며 재배포 허가가 아니다.
 - VM 테스트 43개 통과. VM CPU(OMP 2스레드)에서 warm-up 5.1초, 사진당 3.8~6.8초, 최대 RSS 811MB. VM이 만든 좌표로 대상 3장을 채점하면 4선 평균 0.918로 로컬과 같다. 사진은 표준입력으로 메모리에서만 처리하고 VM에 저장하지 않았다.
-- **활성화는 하지 않았다.** `PALM_LINE_TRACER_MODEL_PATH` drop-in과 서비스 재시작은 자동 권한 검사에서 차단되어 사용자 확인을 기다린다. 현재 서비스는 재시작 없이 이전 코드로 실행 중(active/running, NRestarts=0)이다. 재시작돼도 환경변수가 없으면 기존 동작이다. 실제 사진 종단 검증도 하지 않았다.
 - 활성화: `~/.config/systemd/user/palm-analysis-development.service.d/tracer-model.conf`에 `Environment=PALM_LINE_TRACER_MODEL_PATH=/home/devspace/projects/palm-analysis-development/data/models/palm-tracer-lines-01.pt`를 두고 `systemctl --user daemon-reload`, 해당 서비스만 재시작한다. 되돌릴 때 이 drop-in을 지우고 같은 순서로 재시작한다. 소스 복원은 백업의 `before/source.tar.gz`를 쓴다.
+- 2026-10-25 19:53 KST 사용자 승인으로 위 drop-in을 추가하고 이 서비스만 재시작했다(기존 `line-model.conf` 유지). active/running·NRestarts=0, 래퍼와 소비자 프로세스 모두 해당 변수를 가지며 소비자 RSS 약 516MB(warm-up 후)다. 다른 VM 서비스·Worker·DB·한도는 바꾸지 않았다.
+- 종단 검증: 그날 UTC dispatch 0/20을 확인한 뒤 기준 사진 `2.jpg` 1장을 개발 Worker로 업로드했다(2회 사용). completed·`ocx`·클라이언트 기준 24.7초, 소비자 20.4초(`line_trace` 4.3초, 관찰 호출 9.8초, 해석 4.5초). 세션은 확인 후 취소(HTTP 200)했고 결과 본문·사진은 저장하지 않았다.
+- AI가 `visible`로 판정한 head 선은 로컬 추적 좌표와 최대 0.0012(정규화) 차이로 일치해 좌표 경로는 확인했다. 그러나 기준 라벨상 4선 모두 visible인 사진에서 AI가 life·heart를 unclear, fate를 not_visible로 판정해 추적 좌표가 버려졌고 **화면에는 1선만 그려진다**. 현재 정확도 병목은 추적기보다 AI의 visibility 판정 게이트다. 1장 결과이며 일반화하지 않는다.
 
 ## 공개 개발 URL 접속 재검증 (2026-10-19 KST)
 
