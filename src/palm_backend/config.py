@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     ocx_base_url: str | None = None
     ocx_api_key: SecretStr | None = None
     ocx_model: str = "gpt-6.1-sol"
+    # Service-level model choice that wins over the PALM_OCX_MODEL secret.
+    ocx_model_override: str | None = None
     line_model_path: str | None = None
     line_tracer_model_path: str | None = None
     ocx_image_detail: Literal['low', 'high', 'original'] = 'high'

@@ -272,7 +272,7 @@ class OCXAnalyzer(ClaudeAnalyzer):
                 "POST", self.settings.ocx_base_url.rstrip("/") + "/v1/responses",
                 headers={"X-OpenCodex-API-Key": self.settings.ocx_api_key.get_secret_value()},
                 json={
-                    "model": self.settings.ocx_model,
+                    "model": self.settings.ocx_model_override or self.settings.ocx_model,
                     "instructions": system,
                     "input": [{"role": "user", "content": inputs}],
                     "max_output_tokens": self.settings.ocx_observation_max_output_tokens if model is Observation else 2500,

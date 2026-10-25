@@ -11,6 +11,7 @@ def test_worker_bootstrap_preserves_model_options_but_drops_admin_secrets(monkey
         monkeypatch.setenv(key, 'test-only')
     monkeypatch.setenv('PALM_LINE_MODEL_PATH', '/test-only/palm-lines.pth')
     monkeypatch.setenv('PALM_LINE_TRACER_MODEL_PATH', '/test-only/lines.pt')
+    monkeypatch.setenv('PALM_OCX_MODEL_OVERRIDE', 'test-only/model')
     monkeypatch.setenv('OMP_NUM_THREADS', '2')
     monkeypatch.setenv('MKL_NUM_THREADS', '2')
     monkeypatch.setenv('Supabase_access_token', 'test-admin-secret')
@@ -22,5 +23,6 @@ def test_worker_bootstrap_preserves_model_options_but_drops_admin_secrets(monkey
     env = calls[0]
     assert env['PALM_LINE_MODEL_PATH'] == '/test-only/palm-lines.pth'
     assert env['PALM_LINE_TRACER_MODEL_PATH'] == '/test-only/lines.pt'
+    assert env['PALM_OCX_MODEL_OVERRIDE'] == 'test-only/model'
     assert env['OMP_NUM_THREADS'] == env['MKL_NUM_THREADS'] == '2'
     assert all(name not in env for name in ('Supabase_access_token', 'INFISICAL_TOKEN', 'Supabase_DB_SECRET'))

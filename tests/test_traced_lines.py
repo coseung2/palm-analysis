@@ -126,4 +126,11 @@ def test_ocx_uses_lighter_effort_for_traced_observation_and_narration(monkeypatc
             observed = await analyzer.observe(PreparedImage(data=photo(), digest='a' * 64))
             await analyzer.narrate(observed, BoothConfig())
         assert [body['reasoning'] for body in bodies] == [{'effort': 'low'}, {'effort': 'low'}]
+        assert {body['model'] for body in bodies} == {'gpt-6.1-sol'}
+
+        bodies.clear()
+        override = config.model_copy(update={'ocx_model_override': 'test-only/flash'})
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            await OCXAnalyzer(override, client).observe(PreparedImage(data=photo(), digest='a' * 64))
+        assert bodies[0]['model'] == 'test-only/flash'
     asyncio.run(run())
