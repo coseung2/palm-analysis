@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8,<10", "ruff>=0.12,<1"]
+training = ["torch==2.8.0", "numpy==1.26.4", "scikit-image==0.25.2"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

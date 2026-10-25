@@ -79,6 +79,29 @@
 - CLI `migration new`와 `db diff`는 `Unsupported Config Type ""` 오류다. 공식 이력 정상화는 미완료이며 강제 repair/기존 DB 재초기화는 하지 않는다.
 - 소스 변경이 기존 적용 체크섬과 다르면 설치 스크립트는 덮어쓰지 않고 중단한다. 후속 변경은 새 검증·새 리비전으로 적용한다.
 
+## 4선 오프라인 학습 기반 반영 (2026-10-19 KST)
+
+- `src/palm_training/`는 `palm_backend`와 분리된 validate/train/evaluate/qualify 도구다. 사람·원본·파일/픽셀 중복의 split 간 누수, 권한·검수 기록 누락, 미검수 선을 차단한다. unclear 채널은 손실·평가에서 제외하며 관측되지 않는 선의 오검출을 별도 평가한다.
+- 독립된 작은 4채널 U-Net 기준선이며 사전학습 가중치를 사용하지 않았다. validation에서 epoch/임계값을 고르고 별도 부스 test에서 평가한다. 후보 비교는 임시 엔지니어링 기준이며 현재 AI 분석 대비 우수함을 증명하거나 자동 배포하지 않는다.
+- 로컬 Python 139개·JS 56개 테스트 통과, 추가 소스 lint 및 pip check 통과. 기존 테스트의 사용 중단 경고 2개가 있다. 로컬에는 실행 검증용 CPU PyTorch 2.8.0만 추가했으며 GPU 학습은 실행하지 않았다.
+- VM에 신규 패키지·학습 테스트·TRAINING.md만 추가했다. 대상 파일 사전 부재 확인, 전송 후 SHA256 일치, 배포 중 기존 Python 분석 소스와 실행 래퍼의 해시 불변 확인. 서버 의존성·기존 모델·환경·시크릿·한도·DB·Worker 배포는 변경하지 않았다.
+- VM에서 신규 학습 테스트 29개가 통과했다. 합성 입력의 1 epoch 학습→가중치 저장/재로딩→4선 평가→승격 차단까지 검증했다. VM에 기존 회귀 테스트 파일이 없어 기존 테스트까지 실행하려던 첫 명령은 pytest 수집 오류로 중단했다. 이후 신규 테스트만 정상 실행했으며 전체 VM 회귀 검증으로 표시하지 않는다.
+- 반영 기록: `/home/devspace/projects/palm-analysis-development/data/releases/training-20261018T205645Z/manifest.json` (UTC). 서비스는 재시작하지 않았고 확인 시 active/running·NRestarts=0이다. 기존 소비자는 새 학습 모듈을 import하지 않는다.
+- 학습 기반 반영 당시 PC와 VM의 기본 `urllib` `/health` GET은 Cloudflare 403·`error code: 1010`이었고 브라우저 도구도 일시 장애여서 공개 접근 검증을 보류했다. 파일 체크섬·29개 테스트·당시 서비스 상태와 한계는 같은 릴리스 디렉터리의 `verification.json`에 보존한다. 이후 공개 접속 재검증에서는 브라우저와 기본 `httpx`가 정상임을 확인했다. 아래 공개 URL 검증 기록을 참고한다.
+- **실제 데이터 학습·정확도 비교·새 가중치 서비스 활성화는 미완료**다. Roboflow 접근/라벨/권한 확인 또는 별도 학습 동의를 받은 부스 정답셋이 필요하다. 학습 데이터가 없는 상태에서 생성한 합성 테스트 모델은 실제 분석에 사용하지 않는다. production 차단을 유지한다.
+- 상세 입력 계약·명령·검증 한계는 [TRAINING.md](TRAINING.md)를 참고한다. 신규 파일은 Git commit/push하지 않은 상태에서 사용자 승인에 따라 VM에 추가했으며 릴리스 기록은 파일 해시를 기준으로 한다.
+
+## 공개 개발 URL 접속 재검증 (2026-10-19 KST)
+
+- 대상: `https://palm-analysis-development.mdownloader.workers.dev`만 읽기 전용으로 확인했다. 시연·staging·production은 변경하지 않았다.
+- 내장 브라우저 `/health` HTTP 200, `status=ok`, `analysis_mode=ocx`, 공개 세션 활성 상태를 확인했다. 이는 Worker 설정 검사이며 DB/AI의 전체 분석 성공 증거는 아니다.
+- 실제 첫 화면 로드 및 `/`, `/app.js`, `/scene.js`, `/style.css`의 HTTP 200, 브라우저 콘솔 오류 없음, 375px viewport에서 document 너비 375px·가로 넘침 없음 확인. 화면을 캡처했다. 실제 모바일 기기의 카메라 검증은 아니다.
+- PC와 VM에서 기본 `httpx`는 `/health`와 `/v1/config`에 200, 무인증 `/v1/operator`에 401·`invalid_credentials`를 받았다. PC `httpx`로 첫 HTML·app.js·style.css도 200을 확인했다. 세션 생성이나 사진 업로드 없이 조회했다.
+- 같은 시점 PC·VM의 기본 `urllib`만 `/health`에 403·`error code: 1010`을 받았다. 브라우저·다른 기본 클라이언트가 성공하므로 사이트 전체 접근 불능이 아니라 클라이언트 의존 거부로 관측한다. User-Agent 위장이나 접근 통제 우회는 하지 않았다.
+- Cloudflare 공식 error 1010 설명은 브라우저 서명에 따른 소유자 접근 거부다. 세부 작동 규칙·보안 이벤트·UA와 TLS 특성 중 어떤 값이 원인인지는 관리 로그를 읽지 않았으므로 확정하지 않는다. 근거: https://developers.cloudflare.com/support/troubleshooting/http-status-codes/cloudflare-1xxx-errors/error-1010/
+- 이후 단순 health 점검에는 기존 `httpx` 클라이언트와 브라우저를 사용하고, 기본 `urllib`의 1010만으로 서비스 전체 장애를 선언하지 않는다. `probe_deployed.py`와 `probe_gateway.mjs`는 실제 상류 호출을 발생시키므로 읽기 전용 점검 목적으로 실행하지 않는다.
+- VM 소비자 active/running·NRestarts=0 재확인. 배포·서비스 재시작·보안 설정 완화·요금제·한도 변경·사진 분석·DB 쓰기는 하지 않았다. 실사진 분석·실기기 카메라·새 학습 모델의 정확도는 이번 접속 검증의 범위 밖이다.
+
 ## 완료된 증거와 출시 차단 항목
 
 ### 확인된 증거
