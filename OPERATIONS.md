@@ -7,7 +7,7 @@
 - 기존 시연: `palm-analysis`, Supabase `pyugqoogcoynvywihgym`. 이번 실제용 개발에서 DB와 배포를 변경하지 않았다.
 - 격리 개발: Supabase `ihkbmxwidahgbrvxmrrk`, Worker 설정 `development`, VM `/home/devspace/projects/palm-analysis-development`.
 - VM 소비자: 사용자 서비스 `palm-analysis-development.service`. 네트워크 listener가 없으며 RPC/비공개 사진/OCX에만 발신한다.
-- 개발 `PALM_RUNTIME_READY=true`, 부스당 UTC 일일 상류 호출 20회·대기 2개·실행 1개로 활성화했다. 시작할 때 받은 환경값을 쓰므로 readiness를 바꾸면 해당 서비스 재시작이 필요하다. production은 활성화하지 않았다.
+- 개발 `PALM_RUNTIME_READY=true`, 부스당 UTC 일일 상류 호출 20회·대기 2개·실행 1개로 활성화했다. 2026-10-25 21:3x KST 사용자 지시("한도 걸지 마")로 개발 부스 `daily_call_limit`를 스키마 최대치 10000으로 올렸다(사실상 무제한, 대기 2·실행 1은 유지). 로그인 없는 공개 URL이라 누구나 상류 호출 비용을 쓸 수 있다. `scripts/arm_development.py`는 한도 20을 기대하므로 이제 재실행하면 덮어쓰지 않고 중단한다. 시작할 때 받은 환경값을 쓰므로 readiness를 바꾸면 해당 서비스 재시작이 필요하다. production은 활성화하지 않았다.
 - `production` Worker는 코드에서 차단 중. 개발 검증을 운영 전환 완료로 취급하지 않는다.
 - 방문객은 로그인 없이 체험한다. 세션별 접근 토큰은 탭 메모리에만 보관하고, 설정 변경은 비공개 운영 키로 보호한다.
 - PC/VM 공유 머신의 palm-analysis 역할은 승인 후 Member다. 인증을 회전하거나 다른 프로젝트 역할을 변경하지 않았다.
