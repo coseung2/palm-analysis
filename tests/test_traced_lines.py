@@ -39,12 +39,16 @@ def test_resample_keeps_both_ends_within_trace_limit():
     assert resample(points[:5]) == points[:5]
 
 
-def test_traced_coordinates_replace_model_drawing_only_for_visible_lines():
-    traced = {'life': [(.3, .4), (.5, .6)], 'heart': [(.2, .2), (.8, .2)]}
+def test_traced_coordinates_replace_model_drawing_and_decide_trusted_visibility():
+    traced = {'life': [(.3, .4), (.5, .6)], 'heart': [(.2, .2), (.8, .2)], 'fate': [(.5, .9), (.5, .5)]}
     lines = {line.name: line for line in apply_traces(observation(), traced).lines}
     assert [(p.x, p.y) for p in lines['life'].trace] == [(.3, .4), (.5, .6)]
-    assert lines['head'].trace == []  # visible to the model but not traced: draw nothing
-    assert lines['heart'].trace == []  # traced but judged unclear: draw nothing
+    assert lines['head'].visibility == 'visible' and lines['head'].trace == []  # untraced: draw nothing
+    # Traced heart is drawn although the model judged it unclear.
+    assert lines['heart'].visibility == 'visible'
+    assert [(p.x, p.y) for p in lines['heart'].trace] == [(.2, .2), (.8, .2)]
+    # Traced fate still needs the model's confirmation.
+    assert lines['fate'].visibility == 'not_visible' and lines['fate'].trace == []
     assert apply_traces(observation(), None) == observation()
 
 

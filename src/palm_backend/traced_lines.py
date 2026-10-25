@@ -1,7 +1,7 @@
 """Optional local tracer as the source of drawn line positions.
 
-The tracer (line_tracer + a hash-pinned lines-01 evidence model) places the polylines; the
-language model only judges visibility and writes descriptions. Any failure returns None so the
+The tracer (line_tracer + a hash-pinned lines-01 evidence model) places the polylines and decides
+which of life/head/heart are visible; the language model confirms fate and writes descriptions. Any failure returns None so the
 caller keeps its previous behaviour; a missing crease is never filled with a template.
 """
 import hashlib
@@ -17,6 +17,10 @@ from .models import LINE_NAMES, Observation
 CHECKPOINT_SHA256 = 'c19e0056210198964cb22fdb6305d5d677703f719a3acd56a51dea6bbc4d98ce'
 MAX_POINTS = 24
 COLORS = {'life': (230, 40, 40), 'head': (30, 110, 255), 'heart': (0, 170, 90), 'fate': (170, 60, 220)}
+# Lines whose traced visibility stands on its own. On 103 PLSU validation photos lines-01 drew
+# life/head/heart where no crease was labelled 4/0/0 times but fate 34 times, so a traced fate
+# line is still drawn only when the language model confirms it.
+TRUSTED = ('life', 'head', 'heart')
 _LOCK = Lock()
 
 
@@ -79,11 +83,16 @@ def render_traces(photo: bytes, lines: dict) -> bytes:
 
 
 def apply_traces(observation: Observation, lines: dict | None) -> Observation:
-    """Replace model-drawn coordinates with traced ones; visible-but-untraced lines draw nothing."""
+    """Replace model-drawn coordinates with traced ones; visible-but-untraced lines draw nothing.
+
+    A traced TRUSTED line is visible whatever the model judged; fate needs both to agree.
+    """
     if lines is None:
         return observation
     data = observation.model_dump()
     for line in data['lines']:
         traced = lines.get(line['name'], [])
+        if traced and line['name'] in TRUSTED:
+            line['visibility'] = 'visible'
         line['trace'] = [{'x': x, 'y': y} for x, y in traced] if line['visibility'] == 'visible' else []
     return Observation.model_validate(data)

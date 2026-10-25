@@ -200,7 +200,7 @@ class ClaudeAnalyzer:
             if traced is not None:
                 found = ', '.join(name for name in ('life', 'head', 'heart', 'fate') if name in traced) or '없음'
                 content.extend([
-                    {'type': 'text', 'text': f'다음 이미지는 첫 전체 사진에 로컬 선 추적기가 그린 선입니다(빨강 life, 파랑 head, 초록 heart, 보라 fate). 추적된 선: {found}. 선 위치는 이 로컬 추적 결과로 표시하므로 모든 trace는 빈 배열 []로 반환하세요. 추적선을 원본과 대조해 실제 주름 위에 있으면 그 주름을 기술하고, 원본에서 확인되지 않는 주름 위에 있으면 해당 선을 unclear로 두세요. 추적되지 않은 선은 원본에서 뚜렷하게 확인될 때만 visible로 두세요. 추적 결과는 검증된 정답이 아니며 사진 거부 사유가 아닙니다.'},
+                    {'type': 'text', 'text': f'다음 이미지는 첫 전체 사진에 로컬 선 추적기가 그린 선입니다(빨강 life, 파랑 head, 초록 heart, 보라 fate). 추적된 선: {found}. 선 위치는 이 로컬 추적 결과로 표시하므로 모든 trace는 빈 배열 []로 반환하세요. 추적된 life·head·heart는 화면에 확인된 선으로 표시되므로 visible로 두고, 추적선이 지나는 원본 주름의 길이·곡률·깊이·끊김을 기술하세요. 추적된 fate는 원본과 대조해 실제 주름 위에 있을 때만 visible로 두고, 아니면 unclear로 두세요. 추적되지 않은 선은 원본에서 뚜렷하게 확인될 때만 visible로 두세요. 추적 결과는 사진 거부 사유가 아닙니다.'},
                     {'type': 'image', 'source': {
                         'type': 'base64', 'media_type': 'image/png',
                         'data': base64.b64encode(render_traces(image.data, traced)).decode('ascii'),
