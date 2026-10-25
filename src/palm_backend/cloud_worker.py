@@ -118,6 +118,10 @@ async def run_once():
 async def main():
     configure()
     configure_timing()
+    if path := os.environ.get('PALM_LINE_TRACER_MODEL_PATH'):
+        from .traced_lines import warm_up
+
+        asyncio.get_running_loop().run_in_executor(None, warm_up, path)
     while True:
         try:
             await run_once()

@@ -114,6 +114,11 @@ def create_app(settings: Settings | None = None, analyzer: Analyzer | None = Non
                             task.cancel()
                     store.purge()
 
+            if settings.analysis_mode != "demo" and settings.line_tracer_model_path:
+                from .traced_lines import warm_up
+
+                # Background thread: start-up must not wait for the optional tracer.
+                asyncio.get_running_loop().run_in_executor(None, warm_up, settings.line_tracer_model_path)
             cleanup_task = asyncio.create_task(cleanup())
             try:
                 yield

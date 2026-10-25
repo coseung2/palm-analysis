@@ -191,7 +191,23 @@ class ClaudeAnalyzer:
                     'data': base64.b64encode(image.enhanced_detail).decode('ascii'),
                 }},
             ])
-        if self.settings.line_model_path and image.palm_detail:
+        traced = None
+        if self.settings.line_tracer_model_path:
+            from .traced_lines import apply_traces, render_traces, trace_lines
+
+            with stage('line_trace'):
+                traced = await asyncio.to_thread(trace_lines, image.data, self.settings.line_tracer_model_path)
+            if traced is not None:
+                found = ', '.join(name for name in ('life', 'head', 'heart', 'fate') if name in traced) or '없음'
+                content.extend([
+                    {'type': 'text', 'text': f'다음 이미지는 첫 전체 사진에 로컬 선 추적기가 그린 선입니다(빨강 life, 파랑 head, 초록 heart, 보라 fate). 추적된 선: {found}. 선 위치는 이 로컬 추적 결과로 표시하므로 모든 trace는 빈 배열 []로 반환하세요. 추적선을 원본과 대조해 실제 주름 위에 있으면 그 주름을 기술하고, 원본에서 확인되지 않는 주름 위에 있으면 해당 선을 unclear로 두세요. 추적되지 않은 선은 원본에서 뚜렷하게 확인될 때만 visible로 두세요. 추적 결과는 검증된 정답이 아니며 사진 거부 사유가 아닙니다.'},
+                    {'type': 'image', 'source': {
+                        'type': 'base64', 'media_type': 'image/png',
+                        'data': base64.b64encode(render_traces(image.data, traced)).decode('ascii'),
+                    }},
+                ])
+        # The traced lines supersede the older experimental crease overlay.
+        if traced is None and self.settings.line_model_path and image.palm_detail:
             from .line_mask import line_overlay
 
             with stage('line_mask'):
@@ -205,7 +221,8 @@ class ClaudeAnalyzer:
                     }},
                 ])
         content.append({'type': 'text', 'text': '사진에서 실제로 확인되는 손금만 기술해 주세요.'})
-        return await self._generate(OBSERVATION_SYSTEM, content, Observation)
+        observation = await self._generate(OBSERVATION_SYSTEM, content, Observation)
+        return observation if traced is None else apply_traces(observation, traced)
 
     async def narrate(self, observation: Observation, config: BoothConfig) -> Story:
         return await self._generate(
