@@ -101,6 +101,8 @@
 - 2026-10-25 19:53 KST 사용자 승인으로 위 drop-in을 추가하고 이 서비스만 재시작했다(기존 `line-model.conf` 유지). active/running·NRestarts=0, 래퍼와 소비자 프로세스 모두 해당 변수를 가지며 소비자 RSS 약 516MB(warm-up 후)다. 다른 VM 서비스·Worker·DB·한도는 바꾸지 않았다.
 - 종단 검증: 그날 UTC dispatch 0/20을 확인한 뒤 기준 사진 `2.jpg` 1장을 개발 Worker로 업로드했다(2회 사용). completed·`ocx`·클라이언트 기준 24.7초, 소비자 20.4초(`line_trace` 4.3초, 관찰 호출 9.8초, 해석 4.5초). 세션은 확인 후 취소(HTTP 200)했고 결과 본문·사진은 저장하지 않았다.
 - AI가 `visible`로 판정한 head 선은 로컬 추적 좌표와 최대 0.0012(정규화) 차이로 일치해 좌표 경로는 확인했다. 그러나 기준 라벨상 4선 모두 visible인 사진에서 AI가 life·heart를 unclear, fate를 not_visible로 판정해 추적 좌표가 버려졌고 **화면에는 1선만 그려진다**. 현재 정확도 병목은 추적기보다 AI의 visibility 판정 게이트다. 1장 결과이며 일반화하지 않는다.
+- 2026-10-25 20:38 KST 사용자 승인으로 커밋 `9584b1c`(추적된 life·head·heart는 추적기가 visible 결정, fate는 AI 확인 유지)를 반영했다. VM의 세 파일이 줄바꿈만 다르고 `03a5cf6`과 같음을 확인했고, 백업 후 교체했다. 백업과 해시: `data/releases/visibility-20261025T113722Z/`(UTC). VM 테스트 74개 통과, 이 서비스만 재시작했다(active/running·NRestarts=0, 변수 유지).
+- 재검증(dispatch 2/20에서 2회 추가): 같은 `2.jpg`로 completed. life·head·heart 3선이 visible로 그려졌고 로컬 추적과 최대 0.014 차이다. 세 선의 AI 설명도 실제 주름을 기술한다. fate는 AI가 unclear로 판단해 그리지 않았다(기준 라벨은 visible). 클라이언트 기준 35.3초, 소비자 31.2초. `line_trace` 4.3초는 같고 관찰 호출이 19.9초로 늘었다(이전 9.8초). 두 번의 표본이라 AI 지연의 원인은 확정하지 않는다. 세션은 취소(HTTP 200)했다.
 
 ## 공개 개발 URL 접속 재검증 (2026-10-19 KST)
 
