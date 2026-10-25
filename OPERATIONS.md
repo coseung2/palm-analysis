@@ -109,7 +109,8 @@
 - DeepSeek 시험(2026-10-25 21:05~21:17 KST, 사용자 지시, **되돌림**): 커밋 `d779b60`의 `PALM_OCX_MODEL_OVERRIDE`(워커 래퍼 허용 목록 포함)와 drop-in `ocx-model.conf`로 `opencode-go/deepseek-v4.1-flash`를 지정했다. 백업: `data/releases/model-20261025T120455Z/`, `jsonword-20261025T121508Z/`(UTC). 현재 drop-in은 삭제했고 서비스는 Infisical의 `gpt-6-luna`로 돌아왔다(active/running·NRestarts=0, 변수 없음).
   - 종단 2회는 `provider_configuration`(OCX 400)으로 실패했다. OCX가 JSON 스키마를 DeepSeek의 `json_object` 모드로 바꾸는데, DeepSeek은 프롬프트에 "json" 단어가 없으면 거부한다. 관찰 프롬프트에 JSON 문구를 넣은 커밋 `5078a65`를 반영했다(다른 모델에도 무해).
   - 그 뒤 종단 1회는 `invalid_provider_result`로 실패했다. 관찰 호출에 16.2초가 걸렸다(luna low 6.0초). 직접 호출로 확인하니 `json_object` 모드라 스키마가 강제되지 않는다. `hand`·각 선의 `trait`가 빠지고 없는 키가 추가됐다. high 추론에서는 응답이 incomplete로 끝난 경우도 있었다.
-  - 이 시험으로 그날 dispatch가 16/20이 됐다. 결론: 현재 OCX 경로의 DeepSeek flash는 더 빠르지도 않고 결과 형식도 지키지 않아 쓰지 않는다.
+  - 21:2x KST 현재 상태(luna·low·JSON 문구) 확인: 개발 사이트 health `ok`, 같은 `2.jpg` completed. life·head·heart가 그려지고 trait가 선 모양을 기술했다. heart trait는 "뚜렷하지 않음"이라 그림과 일부 어긋난다. 클라이언트 기준 28.1초, 소비자 24.2초(관찰 12.5초, 해석 5.9초, 추적 4.2초). low에서도 관찰 시간이 6.0~12.5초로 흔들린다. Worker·웹 자산은 `06f71bb` 이후 변경이 없어 Worker 재배포는 필요 없었다.
+  - 이 시험으로 그날 dispatch가 16/20, 확인 실행까지 18/20이 됐다. 결론: 현재 OCX 경로의 DeepSeek flash는 더 빠르지도 않고 결과 형식도 지키지 않아 쓰지 않는다.
 
 ## 공개 개발 URL 접속 재검증 (2026-10-19 KST)
 
