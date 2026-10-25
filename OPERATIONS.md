@@ -106,6 +106,10 @@
 - 2026-10-25 20:55 KST 사용자 승인으로 커밋 `36936c2`(추적 성공 시 관찰 추론 low·주름 지도 생략, 해석 추론 low)를 반영했다. 교체 전 5개 파일이 `9584b1c`과 같음을 확인했다. 백업과 해시: `data/releases/latency-20261025T115430Z/`(UTC). VM 테스트 75개 통과, 이 서비스만 재시작했다(active/running·NRestarts=0).
 - 재측정(실행 전 dispatch 8/20. 이 작업과 별개로 20:52·20:53 KST에 두 건의 분석이 이전 코드로 실행돼 있었다): 같은 `2.jpg` completed. 클라이언트 기준 21.7초(이전 35.3초), 소비자 16.0초(이전 31.2초), 관찰 호출 6.0초(이전 19.9초·9.8초), 해석 4.5초, `line_trace` 4.2초. life·head·heart 3선이 그려졌고 fate는 unclear다.
 - **품질 저하:** 세 선의 trait가 모두 같은 면책 문구("…시각적 묘사일 뿐, 성격이나 미래를 뜻하지 않습니다")로 나왔다. heart는 visible로 그려졌지만 AI 설명이 "전체 경로를 분명히 확인하기 어렵다"고 해 그림과 어긋나며, 해석 글도 43자로 짧다. low 추론 1회 표본이며 원인은 확정하지 않는다.
+- DeepSeek 시험(2026-10-25 21:05~21:17 KST, 사용자 지시, **되돌림**): 커밋 `d779b60`의 `PALM_OCX_MODEL_OVERRIDE`(워커 래퍼 허용 목록 포함)와 drop-in `ocx-model.conf`로 `opencode-go/deepseek-v4.1-flash`를 지정했다. 백업: `data/releases/model-20261025T120455Z/`, `jsonword-20261025T121508Z/`(UTC). 현재 drop-in은 삭제했고 서비스는 Infisical의 `gpt-6-luna`로 돌아왔다(active/running·NRestarts=0, 변수 없음).
+  - 종단 2회는 `provider_configuration`(OCX 400)으로 실패했다. OCX가 JSON 스키마를 DeepSeek의 `json_object` 모드로 바꾸는데, DeepSeek은 프롬프트에 "json" 단어가 없으면 거부한다. 관찰 프롬프트에 JSON 문구를 넣은 커밋 `5078a65`를 반영했다(다른 모델에도 무해).
+  - 그 뒤 종단 1회는 `invalid_provider_result`로 실패했다. 관찰 호출에 16.2초가 걸렸다(luna low 6.0초). 직접 호출로 확인하니 `json_object` 모드라 스키마가 강제되지 않는다. `hand`·각 선의 `trait`가 빠지고 없는 키가 추가됐다. high 추론에서는 응답이 incomplete로 끝난 경우도 있었다.
+  - 이 시험으로 그날 dispatch가 16/20이 됐다. 결론: 현재 OCX 경로의 DeepSeek flash는 더 빠르지도 않고 결과 형식도 지키지 않아 쓰지 않는다.
 
 ## 공개 개발 URL 접속 재검증 (2026-10-19 KST)
 
