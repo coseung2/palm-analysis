@@ -132,7 +132,9 @@ def test_ocx_uses_lighter_effort_for_traced_observation_and_narration(monkeypatc
             analyzer = OCXAnalyzer(config, client)
             observed = await analyzer.observe(PreparedImage(data=photo(), digest='a' * 64))
             await analyzer.narrate(observed, BoothConfig())
-        assert [body['reasoning'] for body in bodies] == [{'effort': 'low'}, {'effort': 'low'}]
+        assert [body['reasoning'] for body in bodies] == [{'effort': 'medium'}, {'effort': 'low'}]
+        prompt = ' '.join(b['text'] for b in bodies[0]['input'][0]['content'] if b['type'] == 'input_text')
+        assert 'trait는 그 선의 모양만' in prompt and '면책' in prompt
         assert {body['model'] for body in bodies} == {'gpt-6.1-sol'}
 
         bodies.clear()

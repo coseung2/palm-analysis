@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     ocx_image_detail: Literal['low', 'high', 'original'] = 'high'
     ocx_observation_effort: Literal['low', 'medium', 'high', 'xhigh'] = 'high'
     # With traced lines the model only checks quality and fate and writes descriptions.
-    ocx_traced_observation_effort: Literal['low', 'medium', 'high', 'xhigh'] = 'low'
+    ocx_traced_observation_effort: Literal['low', 'medium', 'high', 'xhigh'] = 'medium'
     ocx_narration_effort: Literal['low', 'medium', 'high', 'xhigh'] = 'low'
     ocx_observation_max_output_tokens: int = Field(default=6000, ge=2500, le=16000)
 
