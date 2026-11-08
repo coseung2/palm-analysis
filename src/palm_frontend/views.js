@@ -1,5 +1,5 @@
 import {ABOUT_FALLBACK, LINE_MARKS, LINE_NAMES, LINE_ORDER, privacyCopy} from './copy.js';
-import {renderPalmMap} from './palm-map.js';
+import {BEND_STEPS, LENGTH_STEPS, lineShape, renderPalmMap, renderShapeGlyph} from './palm-map.js';
 
 const el = (tag, props = {}, ...children) => {
   const node = document.createElement(tag);
@@ -88,24 +88,47 @@ function scan(state, actions) {
     el('button', {id: 'cancel', class: 'text-button', type: 'button', onclick: actions.cancel, text: '여행 멈추기'}));
 }
 
+// Three faint stars per measure; lit stars carry the line's colour.
+function stars(label, value, steps) {
+  return el('span', {class: 'star-meter', role: 'img', 'aria-label': `${label} ${steps[value]}`},
+    el('span', {class: 'star-label', 'aria-hidden': 'true', text: label}),
+    el('span', {class: 'star-row', 'aria-hidden': 'true'}, ...steps.map((_, i) => el('i', {class: i <= value ? 'lit' : null, text: '✦'}))),
+    el('span', {class: 'star-value', 'aria-hidden': 'true', text: steps[value]}));
+}
+
+function lineEntry(item, index, selected, actions) {
+  const shape = lineShape(item);
+  const seen = item.visibility === 'visible';
+  return el('li', {class: `line-entry trace-${item.name}${selected ? ' selected' : ''}${seen ? '' : ' faint'}`, 'data-line': item.name},
+    el('button', {type: 'button', class: 'line-entry-head', 'data-reading-line': item.name, 'aria-expanded': String(selected), onclick: () => actions.line(index)},
+      el('span', {class: 'line-symbol', text: LINE_MARKS[item.name]}),
+      el('span', {class: 'line-entry-title'},
+        el('h3', {text: LINE_NAMES[item.name]}),
+        el('span', {class: 'line-entry-trait', text: seen ? item.trait : '안개 속에 잠긴 선'})),
+      shape ? renderShapeGlyph(item.name, shape.points) : null),
+    selected ? el('div', {class: 'line-entry-body', 'aria-live': 'polite'},
+      shape ? el('div', {class: 'line-entry-stars'}, stars('길이', shape.lengthStep, LENGTH_STEPS), stars('곡률', shape.bendStep, BEND_STEPS)) : null,
+      el('p', {class: 'line-reading', text: item.reading})) : null);
+}
+
 function reading(state, actions) {
   const lines = LINE_ORDER.map(name => state.result.lines.find(line => line.name === name));
   const line = lines[state.lineIndex];
   return el('section', {id: 'reading', class: 'screen reading', 'aria-labelledby': 'resultTitle'},
     el('div', {class: 'reading-top'}, el('p', {class: 'kicker', text: '03 / YOUR PALM'}), el('span', {id: 'hand', class: 'kicker', text: {left: '왼손', right: '오른손'}[state.result.hand] || ''})),
+    el('h2', {id: 'resultTitle', class: 'reading-title'}, '손에 새겨진 ', el('em', {text: '당신의 선.'})),
     el('div', {class: 'story-layout'},
-      el('div', {class: 'story-heading'},
-        el('h2', {id: 'resultTitle'}, '손에 새겨진', el('br'), el('em', {text: '당신의 선.'}))),
+      el('div', {class: 'story-palm'}, renderPalmMap(state.photo?.url, state.result, line.name)),
       el('div', {class: 'story-content', id: 'storyContent', tabindex: '-1'},
-        el('nav', {id: 'lineTabs', class: 'line-tabs', 'aria-label': '손금 선택'}, ...lines.map((item, index) =>
-          el('button', {type: 'button', 'data-reading-line': item.name, 'aria-pressed': String(index === state.lineIndex), onclick: () => actions.line(index)},
-            el('span', {class: `line-key trace-${item.name}`, 'aria-hidden': 'true'}), `${LINE_MARKS[item.name]} ${LINE_NAMES[item.name]}`))),
-        renderPalmMap(state.photo?.url, state.result, line.name),
-        el('div', {id: 'storyLines', 'aria-live': 'polite'},
-          el('section', {class: 'story-line', 'data-line': line.name},
-            el('div', {class: 'line-header'}, el('span', {class: 'line-symbol', text: LINE_MARKS[line.name]}), el('h3', {text: LINE_NAMES[line.name]})),
-            el('p', {class: 'line-reading', text: line.reading}))))),
+        el('ol', {id: 'storyLines', class: 'line-index', 'aria-label': '손금별 모양과 해석'},
+          ...lines.map((item, index) => lineEntry(item, index, index === state.lineIndex, actions))),
+        el('p', {class: 'fine meter-note', text: '✦ 길이·곡률은 사진 위에 그린 선의 모양만 잰 값입니다.'}))),
     el('div', {class: 'reading-bottom'},
+      el('div', {class: 'export-actions'},
+        el('button', {id: 'shareResult', class: 'cta', type: 'button', disabled: Boolean(state.exporting) || undefined, onclick: actions.share},
+          el('span', {text: state.exporting === 'share' ? '이미지를 만드는 중…' : '카카오톡으로 보내기'}), el('span', {'aria-hidden': 'true', text: '✦'})),
+        el('button', {id: 'printResult', class: 'ghost', type: 'button', disabled: Boolean(state.exporting) || undefined, onclick: actions.print, text: state.exporting === 'print' ? '준비 중…' : '출력하기'}),
+        el('p', {class: 'fine export-note', role: 'status', 'aria-live': 'polite', text: state.exportNote || ''})),
       el('div', {class: 'footer'},
         el('button', {id: 'again', class: 'text-button', type: 'button', onclick: actions.retake, text: '다시 촬영'}),
         el('button', {id: 'done', class: 'ghost', type: 'button', onclick: actions.finish, text: '처음으로 ↗'}))));

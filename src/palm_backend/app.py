@@ -203,7 +203,8 @@ def create_app(settings: Settings | None = None, analyzer: Analyzer | None = Non
 
     @app.get("/health")
     async def health():
-        return {"status": "ok", "analysis_mode": settings.analysis_mode, "public_sessions": settings.public_sessions}
+        return {"status": "ok", "analysis_mode": settings.analysis_mode, "public_sessions": settings.public_sessions,
+                "kakao_js_key": settings.kakao_js_key or None}
 
     @app.get('/v1/operator', dependencies=[Depends(operator)])
     async def operator_status():

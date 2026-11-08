@@ -116,7 +116,7 @@ def test_web_assets_preserve_api_authentication(client):
 
 
 def test_health_and_authentication(client):
-    assert client.get("/health").json() == {"status": "ok", "analysis_mode": "demo", "public_sessions": False}
+    assert client.get("/health").json() == {"status": "ok", "analysis_mode": "demo", "public_sessions": False, "kakao_js_key": None}
     assert client.post("/v1/sessions", json={}).status_code == 401
     assert client.get("/v1/config").status_code == 401
     assert (

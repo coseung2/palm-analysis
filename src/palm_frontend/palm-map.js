@@ -6,7 +6,37 @@ export function tracePoints(line) {
   return line.trace.map(p => [p.x * 1000, p.y * 1000]);
 }
 
-const svgNode = (tag, attributes = {}) => {
+export const LENGTH_STEPS = ['짧음', '보통', '긺'];
+export const BEND_STEPS = ['곧음', '완만', '깊음'];
+const step = (value, low, high) => value < low ? 0 : value < high ? 1 : 2;
+
+// Shape of a drawn trace in the 0–1000 map box: length against the box side, bend as the largest
+// distance from the chord against the chord. Measures the drawn line only, nothing else.
+export function lineShape(line) {
+  const points = tracePoints(line);
+  if (!points.length) return null;
+  let length = 0;
+  for (let i = 1; i < points.length; i++) length += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
+  const [ax, ay] = points[0], [bx, by] = points[points.length - 1];
+  const chord = Math.hypot(bx - ax, by - ay);
+  const bend = chord ? Math.max(...points.map(([x, y]) => Math.abs((bx - ax) * (ay - y) - (ax - x) * (by - ay)) / chord)) / chord : 0;
+  const lengthStep = step(length / 1000, .35, .6), bendStep = step(bend, .06, .15);
+  return {points, length: length / 1000, bend,
+    lengthStep, lengthLabel: LENGTH_STEPS[lengthStep], bendStep, bendLabel: BEND_STEPS[bendStep]};
+}
+
+// Small silhouette of one trace, scaled to fit, for the per-line panel.
+export function renderShapeGlyph(name, points) {
+  const xs = points.map(p => p[0]), ys = points.map(p => p[1]);
+  const [minX, minY] = [Math.min(...xs), Math.min(...ys)];
+  const scale = 80 / Math.max(Math.max(...xs) - minX, Math.max(...ys) - minY, 1);
+  const offX = (100 - (Math.max(...xs) - minX) * scale) / 2, offY = (100 - (Math.max(...ys) - minY) * scale) / 2;
+  const svg = svgNode('svg', {viewBox: '0 0 100 100', class: `shape-glyph trace-${name}`, 'aria-hidden': 'true'});
+  svg.append(svgNode('polyline', {points: points.map(([x, y]) => `${(offX + (x - minX) * scale).toFixed(1)},${(offY + (y - minY) * scale).toFixed(1)}`).join(' ')}));
+  return svg;
+}
+
+const svgNode =(tag, attributes = {}) => {
   const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
   for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, String(value));
   return node;

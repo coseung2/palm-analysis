@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {tracePoints, renderPalmMap} from '../src/palm_frontend/palm-map.js';
+import {tracePoints, renderPalmMap, lineShape} from '../src/palm_frontend/palm-map.js';
 
 test('only visible bounded polylines are rendered, never a template', () => {
   const line={visibility:'visible',trace:[{x:.1,y:.2},{x:.8,y:.9}]};
@@ -27,4 +27,14 @@ test('map keeps original photo, selected line, SVG namespace and no invented tra
   } finally {
     if(previous===undefined) delete globalThis.document;else globalThis.document=previous;
   }
+});
+
+test('shape meters measure only the drawn trace', () => {
+  const straight=lineShape({visibility:'visible',trace:[{x:.1,y:.5},{x:.5,y:.5},{x:.9,y:.5}]});
+  assert.equal(straight.bendLabel,'곧음');
+  assert.equal(straight.lengthLabel,'긺');
+  const arc=lineShape({visibility:'visible',trace:[{x:.4,y:.3},{x:.3,y:.45},{x:.4,y:.6}]});
+  assert.equal(arc.bendLabel,'깊음');
+  assert.equal(arc.lengthLabel,'보통');
+  assert.equal(lineShape({visibility:'unclear',trace:[]}),null);
 });

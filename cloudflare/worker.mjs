@@ -50,17 +50,21 @@ function dbReply(data, status=200) {
   const {http_status,...body}=data;
   return reply(body,http_status||status);
 }
+// Kakao JavaScript keys are public (domain-restricted in the Kakao console); only a well-formed one is exposed.
+export function kakaoKey(env) {
+  return /^[0-9a-f]{32}$/.test(env.PALM_KAKAO_JS_KEY||'') ? env.PALM_KAKAO_JS_KEY : null;
+}
 export function publicDemo(env) {
   return env.PALM_ENVIRONMENT==='demo' && env.PALM_PUBLIC_DEMO==='true' && env.PALM_AUTH_MODE!=='supabase';
 }
 export async function handle(request, env) {
   const {pathname}=new URL(request.url);
-  if(pathname==='/health') return request.method==='GET' ? reply({status:runtimeReady(env)?'ok':'not_ready',analysis_mode:env.PALM_AUTH_MODE==='public_booth'?'ocx':'demo',demo_without_photo:env.PALM_AUTH_MODE!=='public_booth',public_sessions:env.PALM_AUTH_MODE==='public_booth'||publicDemo(env),temporary_photo_storage:env.PALM_AUTH_MODE==='public_booth',storage:'supabase'},runtimeReady(env)?200:503) : fail(405,'method_not_allowed','허용되지 않는 요청입니다.');
+  if(pathname==='/health') return request.method==='GET' ? reply({status:runtimeReady(env)?'ok':'not_ready',analysis_mode:env.PALM_AUTH_MODE==='public_booth'?'ocx':'demo',demo_without_photo:env.PALM_AUTH_MODE!=='public_booth',public_sessions:env.PALM_AUTH_MODE==='public_booth'||publicDemo(env),temporary_photo_storage:env.PALM_AUTH_MODE==='public_booth',storage:'supabase',kakao_js_key:kakaoKey(env)},runtimeReady(env)?200:503) : fail(405,'method_not_allowed','허용되지 않는 요청입니다.');
   if(!pathname.startsWith('/v1/')) {
     const response=await env.ASSETS.fetch(request);
     const headers=new Headers(response.headers);
     headers.set('X-Content-Type-Options','nosniff'); headers.set('Referrer-Policy','no-referrer');
-    headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+    headers.set('Content-Security-Policy',"default-src 'self'; script-src 'self' https://t1.kakaocdn.net; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' blob:; media-src 'self' blob:; connect-src 'self' https://kapi.kakao.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'");
     headers.set('Permissions-Policy','camera=(self), microphone=(), geolocation=()');
     return new Response(response.body,{status:response.status,headers});
   }

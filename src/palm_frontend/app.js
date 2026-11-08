@@ -4,6 +4,7 @@ import {PHOTO_LIMIT, PHOTO_TYPES, LINE_ORDER} from './copy.js';
 import {isServiceReady, requireRealResult} from './contract.js';
 import {createSessionClient} from './session.js';
 import {aboutText, privacyText, renderApp} from './views.js';
+import {printResult, renderResultImage, shareResult, shareToKakao} from './share.js';
 
 const ANALYSIS_LIMIT = 180000;
 const SCAN_NOTICE = 20000;
@@ -109,7 +110,28 @@ const actions = {
     scene()?.line(lineName());
   },
   analyze() { readPalm(); },
+  share() { exportResult('share'); },
+  print() { exportResult('print'); },
 };
+
+const EXPORT_NOTES = {kakao: '', shared: '', cancelled: '', saved: '결과 이미지를 저장했습니다. 카카오톡에서 사진으로 보내 주세요.'};
+async function exportResult(kind) {
+  if (state.exporting || !state.result) return;
+  state.exporting = kind;
+  state.exportNote = '';
+  draw();
+  try {
+    const blob = await renderResultImage(state.photo?.url, state.result);
+    if (kind === 'print') printResult(blob);
+    // Without a configured Kakao key, fall back to the system share sheet or a saved image.
+    else state.exportNote = EXPORT_NOTES[state.kakaoKey ? await shareToKakao(blob, state.kakaoKey) : await shareResult(blob)];
+  } catch (error) {
+    state.exportNote = `결과를 내보내지 못했습니다. ${error.message}`;
+  } finally {
+    state.exporting = null;
+    if (state.screen === 'reading') draw();
+  }
+}
 
 let leaving = null;
 function leave(target) {
@@ -170,7 +192,7 @@ async function readPalm() {
     if (run !== generation) return;
     // Keep only the tab-local preview URL for the result overlay; leaving revokes it.
     if (state.photo) state.photo.file = null;
-    go('reading', {result: view.result, lineIndex: 0});
+    go('reading', {result: view.result, lineIndex: 0, exportNote: ''});
   } catch (error) {
     if (run !== generation) return;
     releasePhoto();
@@ -183,6 +205,7 @@ async function connect() {
     const health = await api('/health');
     if (!isServiceReady(health)) throw new Error('unavailable');
     state.temporaryPhotoStorage = health.temporary_photo_storage === true;
+    state.kakaoKey = /^[0-9a-f]{32}$/.test(health.kakao_js_key || '') ? health.kakao_js_key : null;
     state.serviceReady = true;
   } catch { state.serviceReady = false; }
   if (state.screen === 'welcome') draw();

@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     max_active_analyses: int = Field(default=2, ge=1, le=8)
     max_sessions: int = Field(default=500, ge=1, le=10000)
     cors_origins: list[str] = Field(default_factory=list)
+    # Public Kakao JavaScript key (domain-restricted in the Kakao console) for KakaoTalk sharing.
+    kakao_js_key: str | None = Field(default=None, pattern=r'^([0-9a-f]{32})?$')
     anthropic_api_key: SecretStr | None = None
     anthropic_model: str = "claude-opus-5-5"
 

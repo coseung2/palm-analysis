@@ -12,7 +12,7 @@ test('static experience keeps scripts local and permits captured media',async()=
   });
   assert.equal(response.status,200);
   const csp=response.headers.get('Content-Security-Policy');
-  assert.match(csp,/script-src 'self';/);
+  assert.match(csp,/script-src 'self' https:\/\/t1\.kakaocdn\.net;/);
   assert.match(csp,/media-src 'self' blob:;/);
   assert.ok(!csp.includes('unsafe-eval'));
   assert.equal(response.headers.get('Permissions-Policy'),'camera=(self), microphone=(), geolocation=()');
@@ -127,4 +127,10 @@ test('session token hashes are not plaintext',async()=>{
 test('malformed JSON gives safe error',async()=>{
   const response=await handle(new Request('https://booth.test/v1/sessions',{method:'POST',headers:auth,body:'{' }),env);
   assert.equal(response.status,422); assert.equal((await response.json()).error.code,'invalid_request');
+});
+
+test('health exposes only a well-formed Kakao JavaScript key',async()=>{
+  const key='0123456789abcdef0123456789abcdef';
+  assert.equal((await (await handle(new Request('https://booth.test/health'),{...env,PALM_KAKAO_JS_KEY:key})).json()).kakao_js_key,key);
+  assert.equal((await (await handle(new Request('https://booth.test/health'),{...env,PALM_KAKAO_JS_KEY:'not a key'})).json()).kakao_js_key,null);
 });
