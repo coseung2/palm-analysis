@@ -38,3 +38,18 @@ test('shape meters measure only the drawn trace', () => {
   assert.equal(arc.lengthLabel,'보통');
   assert.equal(lineShape({visibility:'unclear',trace:[]}),null);
 });
+
+test('a mirrored camera photo flips the photo and trace x together', () => {
+  const previous=globalThis.document;
+  const create=(tag,ns=null)=>({tag,ns,children:[],attrs:{},setAttribute(k,v){this.attrs[k]=v;},append(...children){this.children.push(...children);}});
+  globalThis.document={createElement:create,createElementNS:(ns,tag)=>create(tag,ns)};
+  try {
+    const result={lines:[{name:'life',visibility:'visible',trace:[{x:.1,y:.2},{x:.3,y:.9}]}]};
+    const frame=renderPalmMap('blob:test-only',result,'life',true).children[0];
+    assert.equal(frame.children[0].className,'mirrored');
+    assert.equal(frame.children[1].children[0].children[1].attrs.points,'900,200 700,900');
+    assert.equal(renderPalmMap('blob:test-only',result,'life').children[0].children[1].children[0].children[1].attrs.points,'100,200 300,900');
+  } finally {
+    if(previous===undefined) delete globalThis.document;else globalThis.document=previous;
+  }
+});

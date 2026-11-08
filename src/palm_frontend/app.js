@@ -81,7 +81,8 @@ const actions = {
     if (!file || state.screen !== 'capture') return;
     stopCapture();
     releasePhoto();
-    state.photo = {file, url: URL.createObjectURL(file)};
+    // The analysed file stays unmirrored; `mirrored` only flips what is shown, like the live preview.
+    state.photo = {file, url: URL.createObjectURL(file), mirrored: true};
     state.consent = consent;
     draw();
     if (consent) actions.analyze();
@@ -121,7 +122,7 @@ async function exportResult(kind) {
   state.exportNote = '';
   draw();
   try {
-    const blob = await renderResultImage(state.photo?.url, state.result);
+    const blob = await renderResultImage(state.photo?.url, state.result, Boolean(state.photo?.mirrored));
     if (kind === 'print') printResult(blob);
     // Without a configured Kakao key, fall back to the system share sheet or a saved image.
     else state.exportNote = EXPORT_NOTES[state.kakaoKey ? await shareToKakao(blob, state.kakaoKey) : await shareResult(blob)];

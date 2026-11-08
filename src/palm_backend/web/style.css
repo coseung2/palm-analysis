@@ -28,3 +28,6 @@ body[data-stage="reading"] .atmosphere{background:radial-gradient(ellipse 55% 40
 @media(prefers-reduced-motion:reduce){body[data-stage="reading"] .atmosphere::after{animation:none}}
 @media(max-width:700px){.export-actions{width:100%}.export-actions .cta{flex:1}}
 @media print{@page{margin:10mm}body{background:#fff}body>*:not(#printSheet){display:none!important}#printSheet{display:block!important;width:100%;max-height:277mm;object-fit:contain;margin:auto}}
+
+/* Camera captures keep the selfie (mirrored) view after capture and in the result. */
+img.mirrored{transform:scaleX(-1)}.palm-map-frame img.mirrored{transform:scaleX(-1)}

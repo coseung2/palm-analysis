@@ -47,7 +47,7 @@ function stars(ctx, height) {
 }
 
 // Lays out (and, when `draw`, paints) the sheet; returns its height.
-function layout(ctx, photo, result, draw) {
+function layout(ctx, photo, result, draw, mirrored = false) {
   let y = 120;
   const text = (value, x, font, color, align = 'left') => {
     if (!draw) return;
@@ -68,13 +68,15 @@ function layout(ctx, photo, result, draw) {
       ctx.save();
       ctx.beginPath(); ctx.roundRect(x, y, w, h, [w / 2, w / 2, 16, 16]); ctx.clip();
       ctx.filter = 'sepia(.35) saturate(.8) brightness(.92)';
+      if (mirrored) { ctx.save(); ctx.translate(x * 2 + w, 0); ctx.scale(-1, 1); }
       ctx.drawImage(photo, x, y, w, h);
+      if (mirrored) ctx.restore();
       ctx.filter = 'none';
       for (const name of LINE_ORDER) {
         const shape = lineShape(result.lines.find(line => line.name === name));
         if (!shape) continue;
         ctx.beginPath();
-        shape.points.forEach(([px, py], i) => ctx[i ? 'lineTo' : 'moveTo'](x + px / 1000 * w, y + py / 1000 * h));
+        shape.points.forEach(([px, py], i) => ctx[i ? 'lineTo' : 'moveTo'](x + (mirrored ? 1000 - px : px) / 1000 * w, y + py / 1000 * h));
         ctx.lineCap = ctx.lineJoin = 'round';
         ctx.strokeStyle = '#1a1a19'; ctx.lineWidth = 12; ctx.stroke();
         ctx.shadowColor = COLORS[name]; ctx.shadowBlur = 12;
@@ -127,12 +129,12 @@ function layout(ctx, photo, result, draw) {
   return y + 90;
 }
 
-export async function renderResultImage(photoUrl, result) {
+export async function renderResultImage(photoUrl, result, mirrored = false) {
   await Promise.all([`40px ${SERIF}`, `22px ${SANS}`, `18px 'IBM Plex Mono'`].map(font => document.fonts?.load(font).catch(() => {})));
   const photo = photoUrl ? await loadImage(photoUrl).catch(() => null) : null;
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d');
-  const height = layout(ctx, photo, result, false);
+  const height = layout(ctx, photo, result, false, mirrored);
   canvas.width = W;
   canvas.height = height;
   const background = ctx.createLinearGradient(0, 0, 0, height);
@@ -145,7 +147,7 @@ export async function renderResultImage(photoUrl, result) {
   ctx.fillRect(0, 0, W, height);
   stars(ctx, height);
   ctx.textBaseline = 'alphabetic';
-  layout(ctx, photo, result, true);
+  layout(ctx, photo, result, true, mirrored);
   return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('이미지를 만들지 못했습니다.')), 'image/png'));
 }
 

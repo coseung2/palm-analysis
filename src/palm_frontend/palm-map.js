@@ -42,7 +42,8 @@ const svgNode =(tag, attributes = {}) => {
   return node;
 };
 
-export function renderPalmMap(photoUrl, result, selected) {
+// `mirrored` shows the photo as the selfie preview did; trace x is flipped to match, labels stay readable.
+export function renderPalmMap(photoUrl, result, selected, mirrored = false) {
   const figure = document.createElement('figure');
   figure.className = 'palm-map';
   if (!photoUrl) {
@@ -56,11 +57,12 @@ export function renderPalmMap(photoUrl, result, selected) {
   const photo = document.createElement('img');
   photo.src = photoUrl;
   photo.alt = '분석에 사용한 손바닥 원본과 AI 추정선';
+  if (mirrored) photo.className = 'mirrored';
   const svg = svgNode('svg', {viewBox: '0 0 1000 1000', preserveAspectRatio: 'none', role: 'img', 'aria-label': '사진 위 손금 추정 위치. 아래 손금 이름과 번호로 구분합니다.'});
   let count = 0;
   for (const name of LINE_ORDER) {
     const line = result.lines.find(item => item.name === name);
-    const points = tracePoints(line);
+    const points = tracePoints(line).map(([x, y]) => [mirrored ? 1000 - x : x, y]);
     if (!points.length) continue;
     count++;
     const group = svgNode('g', {class: `palm-trace trace-${name}${name === selected ? ' selected' : ''}`});
