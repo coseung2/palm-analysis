@@ -179,10 +179,12 @@ export async function shareToKakao(blob, key) {
   const imageUrl = uploaded?.infos?.original?.url;
   if (!imageUrl) throw new Error('결과 이미지를 카카오에 올리지 못했습니다.');
   const home = location.origin;
+  const viewer = `${home}/result.html?img=${encodeURIComponent(imageUrl)}`;
   Kakao.Share.sendDefault({
     objectType: 'feed',
     content: {title: '수문 — 손에 새겨진 당신의 선', description: '생명선·감정선·두뇌선·운명선으로 읽은 나의 손금', imageUrl, link: {mobileWebUrl: home, webUrl: home}},
-    buttons: [{title: '결과 이미지 보기', link: {mobileWebUrl: imageUrl, webUrl: imageUrl}}, {title: '나도 해보기', link: {mobileWebUrl: home, webUrl: home}}],
+    // Kakao only opens links on registered domains, so the image opens through our own viewer page.
+    buttons: [{title: '결과 이미지 보기', link: {mobileWebUrl: viewer, webUrl: viewer}}, {title: '나도 해보기', link: {mobileWebUrl: home, webUrl: home}}],
   });
   return 'kakao';
 }

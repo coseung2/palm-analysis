@@ -134,3 +134,11 @@ test('health exposes only a well-formed Kakao JavaScript key',async()=>{
   assert.equal((await (await handle(new Request('https://booth.test/health'),{...env,PALM_KAKAO_JS_KEY:key})).json()).kakao_js_key,key);
   assert.equal((await (await handle(new Request('https://booth.test/health'),{...env,PALM_KAKAO_JS_KEY:'not a key'})).json()).kakao_js_key,null);
 });
+
+test('only the result viewer may show Kakao-hosted images',async()=>{
+  const assets={ASSETS:{fetch:async()=>new Response('page',{headers:{'Content-Type':'text/html'}})}};
+  const viewer=(await handle(new Request('https://booth.test/result.html'),assets)).headers.get('Content-Security-Policy');
+  assert.match(viewer,/img-src 'self' blob: https:\/\/\*\.kakaocdn\.net;/);
+  const home=(await handle(new Request('https://booth.test/'),assets)).headers.get('Content-Security-Policy');
+  assert.match(home,/img-src 'self' blob:;/);
+});
