@@ -1,5 +1,6 @@
 import {ABOUT_FALLBACK, LINE_MARKS, LINE_NAMES, LINE_ORDER, privacyCopy} from './copy.js';
-import {BEND_STEPS, LENGTH_STEPS, lineShape, renderPalmMap, renderShapeGlyph} from './palm-map.js';
+import {lineShape, renderPalmMap, renderShapeGlyph} from './palm-map.js';
+import {renderRadar, validScores} from './radar.js';
 
 const el = (tag, props = {}, ...children) => {
   const node = document.createElement(tag);
@@ -81,16 +82,9 @@ function scan(state, actions) {
     el('button', {id: 'cancel', class: 'text-button', type: 'button', onclick: actions.cancel, text: '여행 멈추기'}));
 }
 
-// Three faint stars per measure; lit stars carry the line's colour.
-function stars(label, value, steps) {
-  return el('span', {class: 'star-meter', role: 'img', 'aria-label': `${label} ${steps[value]}`},
-    el('span', {class: 'star-label', 'aria-hidden': 'true', text: label}),
-    el('span', {class: 'star-row', 'aria-hidden': 'true'}, ...steps.map((_, i) => el('i', {class: i <= value ? 'lit' : null, text: '✦'}))),
-    el('span', {class: 'star-value', 'aria-hidden': 'true', text: steps[value]}));
-}
-
 function lineEntry(item, index, selected, actions) {
   const shape = lineShape(item);
+  const scores = validScores(item);
   const seen = item.visibility === 'visible';
   return el('li', {class: `line-entry trace-${item.name}${selected ? ' selected' : ''}${seen ? '' : ' faint'}`, 'data-line': item.name},
     el('button', {type: 'button', class: 'line-entry-head', 'data-reading-line': item.name, 'aria-expanded': String(selected), onclick: () => actions.line(index)},
@@ -99,9 +93,11 @@ function lineEntry(item, index, selected, actions) {
         el('h3', {text: LINE_NAMES[item.name]}),
         el('span', {class: 'line-entry-trait', text: seen ? item.trait : '안개 속에 잠긴 선'})),
       shape ? renderShapeGlyph(item.name, shape.points) : null),
-    selected ? el('div', {class: 'line-entry-body', 'aria-live': 'polite'},
-      shape ? el('div', {class: 'line-entry-stars'}, stars('길이', shape.lengthStep, LENGTH_STEPS), stars('곡률', shape.bendStep, BEND_STEPS)) : null,
-      el('p', {class: 'line-reading', text: item.reading})) : null);
+    selected ? el('div', {class: `line-entry-body${scores.length ? ' with-radar' : ''}`, 'aria-live': 'polite'},
+      scores.length ? renderRadar(item.name, scores) : null,
+      el('p', {class: 'line-reading', text: item.reading}),
+      scores.length ? el('ul', {class: 'score-basis'}, ...scores.map(s =>
+        el('li', {}, el('b', {text: `${s.trait} ${s.score}%`}), el('span', {text: s.basis || ''})))) : null) : null);
 }
 
 function reading(state, actions) {
@@ -115,7 +111,7 @@ function reading(state, actions) {
       el('div', {class: 'story-content', id: 'storyContent', tabindex: '-1'},
         el('ol', {id: 'storyLines', class: 'line-index', 'aria-label': '손금별 모양과 해석'},
           ...lines.map((item, index) => lineEntry(item, index, index === state.lineIndex, actions))),
-        el('p', {class: 'fine meter-note', text: '✦ 길이·곡률은 사진 위에 그린 선의 모양만 잰 값입니다.'}))),
+        el('p', {class: 'fine meter-note', text: '✦ 점수는 손금의 모양을 전통 해석에 맞춰 매긴 재미용 값입니다.'}))),
     el('div', {class: 'reading-bottom'},
       el('div', {class: 'export-actions'},
         el('button', {id: 'shareResult', class: 'cta', type: 'button', disabled: Boolean(state.exporting) || undefined, onclick: actions.share},

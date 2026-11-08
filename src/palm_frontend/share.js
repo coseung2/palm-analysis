@@ -1,5 +1,6 @@
 import {LINE_MARKS, LINE_NAMES, LINE_ORDER} from './copy.js';
-import {BEND_STEPS, LENGTH_STEPS, lineShape} from './palm-map.js';
+import {lineShape} from './palm-map.js';
+import {drawRadar, validScores} from './radar.js';
 
 // One portrait image of the result (photo + traces + each line), used for both sharing and printing.
 const W = 1080, PAD = 90;
@@ -90,7 +91,6 @@ function layout(ctx, photo, result, draw, mirrored = false) {
 
   for (const name of LINE_ORDER) {
     const line = result.lines.find(item => item.name === name);
-    const shape = lineShape(line);
     if (draw) { ctx.fillStyle = '#ead7ae33'; ctx.fillRect(PAD, y, W - PAD * 2, 1); }
     y += 62;
     text(LINE_MARKS[name], PAD, `30px ${SERIF}`, GOLD);
@@ -102,16 +102,11 @@ function layout(ctx, photo, result, draw, mirrored = false) {
       text(row, PAD + 70, `22px ${SANS}`, DIM);
       y += 34;
     }
-    if (shape) {
-      y += 8;
-      const meter = (label, value, steps, x) => {
-        text(label, x, `20px ${SANS}`, DIM);
-        for (let i = 0; i < 3; i++) text('✦', x + 62 + i * 28, `22px ${SANS}`, i <= value ? COLORS[name] : '#ead7ae40');
-        text(steps[value], x + 160, `20px ${SANS}`, INK);
-      };
-      meter('길이', shape.lengthStep, LENGTH_STEPS, PAD + 70);
-      meter('곡률', shape.bendStep, BEND_STEPS, PAD + 400);
-      y += 34;
+    const scores = validScores(line);
+    if (scores.length) {
+      const R = 150, box = R * 2 + 130;
+      if (draw) drawRadar(ctx, scores, W / 2, y + box / 2, R, COLORS[name], {label: `22px ${SANS}`, value: `24px 'IBM Plex Mono', monospace`});
+      y += box;
     }
     y += 22;
     ctx.font = `30px ${SERIF}`;
@@ -123,7 +118,7 @@ function layout(ctx, photo, result, draw, mirrored = false) {
   }
   if (draw) { ctx.fillStyle = '#ead7ae33'; ctx.fillRect(PAD, y, W - PAD * 2, 1); }
   y += 60;
-  text('손금 해석은 오락용이며 건강·수명·미래에 대한 사실 판단이 아닙니다.', W / 2, `19px ${SANS}`, DIM, 'center');
+  text('점수와 해석은 부스 체험용 오락 콘텐츠이며 실제 진단이나 예측이 아닙니다.', W / 2, `19px ${SANS}`, DIM, 'center');
   y += 40;
   text('수문 — A PALM ODYSSEY', W / 2, `17px 'IBM Plex Mono', monospace`, GOLD, 'center');
   return y + 90;

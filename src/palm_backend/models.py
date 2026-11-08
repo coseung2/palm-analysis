@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 LINE_NAMES = ("life", "head", "heart", "fate")
 DISCLAIMER = (
-    "손금 해석과 전생 이야기는 오락용 창작이며, 건강·수명·미래에 대한 사실 판단이 아닙니다."
+    "손금 점수와 해석, 전생 이야기는 부스 체험용 오락용 콘텐츠입니다. 건강·수명·재물에 대한 실제 진단이나 예측이 아닙니다."
 )
 
 
@@ -76,9 +76,32 @@ class Observation(StrictModel):
         return self
 
 
+# Five entertainment measures read from each line, shown as a radar chart (0–100 each).
+LINE_TRAITS = {
+    "life": ("건강운", "수명운", "활력", "끈기", "회복력"),
+    "head": ("상상력", "직관력", "논리력", "신중함", "집중력"),
+    "heart": ("연애운", "표현력", "공감력", "헌신", "이상주의"),
+    "fate": ("재물운", "성공운", "목표의식", "자립심", "적응력"),
+}
+
+
+class TraitScore(StrictModel):
+    trait: str = Field(min_length=1, max_length=20)
+    score: int = Field(ge=0, le=100)
+    basis: str = Field(min_length=1, max_length=120)
+
+
 class LineReading(StrictModel):
     name: Literal["life", "head", "heart", "fate"]
     reading: str = Field(min_length=1, max_length=500)
+    scores: list[TraitScore] = Field(default_factory=list, max_length=5)
+
+    @model_validator(mode="after")
+    def check_scores(self):
+        # Scores are optional (withheld lines carry none); when present they are exactly this line's five traits.
+        if self.scores and [s.trait for s in self.scores] != list(LINE_TRAITS[self.name]):
+            raise ValueError("Scores must list this line's five traits in order")
+        return self
 
 
 class Story(StrictModel):
@@ -96,6 +119,7 @@ class Story(StrictModel):
 
 class ResultLine(LineObservation):
     reading: str
+    scores: list[TraitScore] = Field(default_factory=list)
 
 
 class AnalysisResult(StrictModel):

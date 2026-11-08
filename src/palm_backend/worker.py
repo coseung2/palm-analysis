@@ -55,11 +55,13 @@ async def consume(job: Job, repository: JobRepository, photos: PrivatePhotos, an
             return
         with stage('narration_total'):
             story = validate_story(await analyzer.narrate(observation, job.config))
-        readings = {line.name: line.reading for line in story.readings}
+        readings = {line.name: line for line in story.readings}
         lines = [ResultLine(
             **line.model_dump(),
-            reading=readings[line.name] if line.visibility == "visible"
+            reading=readings[line.name].reading if line.visibility == "visible"
             else "선이 불명확하거나 보이지 않아 해석을 보류합니다.",
+            # Withheld lines show no made-up scores.
+            scores=readings[line.name].scores if line.visibility == "visible" else [],
         ) for line in observation.lines]
         result = AnalysisResult(
             mode="ocx", is_demo=False, hand=observation.hand,

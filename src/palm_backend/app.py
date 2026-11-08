@@ -260,15 +260,18 @@ def create_app(settings: Settings | None = None, analyzer: Analyzer | None = Non
                 if observation.quality == "retake":
                     raise ProviderError("retake_required", observation.retake_reason, True)
                 story = validate_story(await provider.narrate(observation, view.config))
-                readings = {line.name: line.reading for line in story.readings}
+                readings = {line.name: line for line in story.readings}
+                withheld = {line.name for line in observation.lines
+                            if line.visibility != "visible" and settings.analysis_mode != "demo"}
                 lines = [
                     ResultLine(
                         **line.model_dump(),
                         reading=(
                             "선이 명확하게 확인되지 않아 해석을 보류합니다."
-                            if line.visibility != "visible" and settings.analysis_mode != "demo"
-                            else readings[line.name]
+                            if line.name in withheld
+                            else readings[line.name].reading
                         ),
+                        scores=[] if line.name in withheld else readings[line.name].scores,
                     )
                     for line in observation.lines
                 ]
