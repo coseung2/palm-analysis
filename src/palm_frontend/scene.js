@@ -60,24 +60,29 @@ const cloudTexture=texture(1024,320,(c)=>{
 plane(cloudTexture,11,3.2,-5,3.8,-6,.12);
 plane(cloudTexture,8,2.5,6,1.8,-3,-.09);
 plane(cloudTexture,10,3,-7,-.3,-2,.08);
-function waves(color){return texture(1600,500,(c,w,h)=>{
-  for(let row=0;row<4;row++){
-    const y=100+row*125;
-    for(let col=-1;col<12;col++){
-      const x=col*160+(row%2)*80;
-      c.beginPath();c.arc(x,y,145,Math.PI,0);c.lineTo(x+145,h);c.lineTo(x-145,h);c.closePath();c.fillStyle=color;c.fill();
-      for(let r=145;r>25;r-=10){c.beginPath();c.arc(x,y,r,Math.PI,0);c.strokeStyle=r%20===5?'#172f37':'#d2c29644';c.lineWidth=1.8;c.stroke();}
+// Seigaiha waves: every arc sits fully inside the canvas so each layer ends in a scalloped crest,
+// never a straight cut, and the fill deepens toward the bottom edge of the screen.
+function waves(color,deep){return texture(1600,620,(c,w,h)=>{
+  const R=130,step=150,rows=4;
+  const fill=c.createLinearGradient(0,0,0,h);fill.addColorStop(0,color);fill.addColorStop(1,deep);
+  for(let row=0;row<rows;row++){
+    const y=R+14+row*112;
+    for(let col=-1;col<=Math.ceil(w/step)+1;col++){
+      const x=col*step+(row%2)*step/2;
+      c.beginPath();c.arc(x,y,R,Math.PI,0);c.lineTo(x+R,h);c.lineTo(x-R,h);c.closePath();c.fillStyle=fill;c.fill();
+      for(let r=R-12;r>22;r-=12){c.beginPath();c.arc(x,y,r,Math.PI,0);c.strokeStyle=(R-r)%24===0?'#172f3799':'#d2c29638';c.lineWidth=1.6;c.stroke();}
+      c.beginPath();c.arc(x,y,R,Math.PI*1.04,Math.PI*1.96);c.strokeStyle=row?'#172f37aa':'#e6d5a866';c.lineWidth=row?2:2.6;c.stroke();
     }
   }
 });}
-plane(waves('#3e686a'),28,6.5,0,-5.7,-3,.075);
+plane(waves('#4a7774','#2a4c52'),28,6.8,0,-5.7,-3,.075);
 const boatTex=texture(400,200,(c)=>{
   const paths=[[[25,60],[180,110],[350,45],[260,150],[145,175]],[[110,130],[170,18],[210,105]],[[170,18],[285,90],[210,105]]];
   for(const [i,p] of paths.entries()){c.beginPath();p.forEach(([x,y],j)=>j?c.lineTo(x,y):c.moveTo(x,y));c.closePath();c.fillStyle=['#e7dbbd','#f1e4c8','#a6b7aa'][i];c.fill();c.strokeStyle='#243d43';c.lineWidth=3;c.stroke();}
 });
 const boat=plane(boatTex,1.8,.9,3,-2.5,-.5,.1);
-plane(waves('#487c78'),26,6.5,0,-6.5,0,-.09);
-plane(waves('#315d61'),27,6,0,-7.5,1,.13);
+plane(waves('#3f706d','#21414a'),26,6.8,0,-6.5,0,-.09);
+plane(waves('#2f585e','#142b33'),27,6.4,0,-7.5,1,.13);
 const flowerTexture=texture(128,128,(c)=>{
   c.fillStyle='#d3a38e';c.strokeStyle='#564b48';c.lineWidth=1.5;
   for(let i=0;i<5;i++){c.save();c.translate(64,64);c.rotate(i*Math.PI*2/5);c.beginPath();c.ellipse(0,-23,13,25,0,0,Math.PI*2);c.fill();c.stroke();c.restore();}
