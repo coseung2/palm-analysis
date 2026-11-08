@@ -44,7 +44,7 @@ test('camera falls back to device defaults for rejected constraints', async () =
   camera.stop(); assert.equal(f.stopped, 1);
 });
 
-test('capture saves only guide pixels rather than the full webcam frame', async () => {
+test('capture saves only the camera box pixels rather than the full webcam frame', async () => {
   const f = fixture();
   Object.assign(f.video, {videoWidth:640, videoHeight:480, getBoundingClientRect:() => ({left:100,top:50,width:400,height:300})});
   const drawn = [];

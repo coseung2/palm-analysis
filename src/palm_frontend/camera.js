@@ -93,7 +93,8 @@ export function createCamera({video = document.createElement('video'), getUserMe
   async function capture() {
     const run = generation;
     if (!stream || !video.videoWidth || !video.videoHeight) return null;
-    const guide = document.getElementById('palmGuide');
+    // Save exactly what the camera box shows (the preview is cover-cropped and mirrored).
+    const guide = document.getElementById('cameraSlot');
     if (!guide || guide.hidden) return null;
     const crop = sourceCrop(video.videoWidth, video.videoHeight, video.getBoundingClientRect(), guide.getBoundingClientRect());
     if (!crop) return null;
